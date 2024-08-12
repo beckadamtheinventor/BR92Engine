@@ -1,0 +1,2 @@
+C:\raylib\w64devkit\bin\ar.exe qc librlimgui.a CMakeFiles/rlimgui.dir/rlImGui.cpp.obj
+C:\raylib\w64devkit\bin\ranlib.exe librlimgui.a
