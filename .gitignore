@@ -6,3 +6,8 @@ build/
 .cache/
 CMakeSettings.json
 Makefile
+
+config.dat
+shader.dat
+imgui.ini
+debug.log
