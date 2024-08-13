@@ -2,6 +2,8 @@
 #include "MapData.hpp"
 #include "AssetPath.hpp"
 #include "raylib.h"
+#include "raymath.h"
+#include "raymath.h"
 #include <thread>
 
 #pragma region Const Data
@@ -172,7 +174,7 @@ bool MapData::LoadMapSection(RBuffer<char>& data) {
         }
     }
     maps.append(map);
-    positions.append({(float)x, (float)y, (float)z});
+    positions.append({x, y, z});
     lightmaps.append(new LightMap(sizeX, sizeZ));
     meshes.append(new IntMesh());
     return true;
@@ -181,6 +183,7 @@ bool MapData::LoadMapSection(RBuffer<char>& data) {
 
 #pragma region BuildLighting()
 void MapData::BuildLighting() {
+    TraceLog(LOG_INFO, "Building lighting for %llu lights...", lightList.length());
     DynamicArray<int> heights;
     for (size_t i=0; i<lightList.length(); i++) {
         bool shouldAdd = true;
@@ -202,47 +205,43 @@ void MapData::BuildLighting() {
                 PlacedLight* light = &lightList[j];
                 int xx = light->x;
                 int zz = light->z;
+                addLight(xx, y, zz, light->v, light->r, light->g, light->b);
                 for (int o=-LIGHT_RANGE; o<=LIGHT_RANGE; o++) {
                     bool px_col = false, pz_col = false, mx_col = false, mz_col = false;
+                    addLight(xx+o, y, zz, light->v, light->r, light->g, light->b);
+                    addLight(xx, y, zz+o, light->v, light->r, light->g, light->b);
                     for (int di=1; di<=LIGHT_RANGE; di++) {
-                        float lightValueF = inverseSquareRoot((di*di + o*o) * 0.075f) * light->v;
-                        if (lightValueF > 255.0f) { lightValueF = 255.0f; }
-                        if (lightValueF < 0.0f) { lightValueF = 0.0f; }
-                        unsigned char lightValueC = lightValueF;
-                        if (lightValueC > 0) {
+                        int lightValue = inverseSquareRoot((di*di*0.5f + o*o*0.5f) * 0.075f) * light->v;
+                        if (lightValue > 0) {
                             MapTile* tile;
                             unsigned short tid;
                             if (!pz_col) {
                                 tile = tileRegistry->of(tid = map->getOrDefault({xx+o, zz+di}));
                                 if (tile != nullptr && tile->blocksLight) {
                                     pz_col = true;
-                                } else {
-                                    addLight(xx+o, y, zz+di, lightValueC, light->r, light->g, light->b);
                                 }
+                                addLight(xx+o, y, zz+di, lightValue, light->r, light->g, light->b);
                             }
                             if (!mz_col) {
                                 tile = tileRegistry->of(tid = map->getOrDefault({xx+o, zz-di}));
                                 if (tile != nullptr && tile->blocksLight) {
                                     mz_col = true;
-                                } else {
-                                    addLight(xx+o, y, zz-di, lightValueC, light->r, light->g, light->b);
                                 }
+                                addLight(xx+o, y, zz-di, lightValue, light->r, light->g, light->b);
                             }
                             if (!px_col) {
                                 tile = tileRegistry->of(tid = map->getOrDefault({xx+di, zz+o}));
                                 if (tile != nullptr && tile->blocksLight) {
                                     px_col = true;
-                                } else {
-                                    addLight(xx+di, y, zz+o, lightValueC, light->r, light->g, light->b);
                                 }
+                                addLight(xx+di, y, zz+o, lightValue, light->r, light->g, light->b);
                             }
                             if (!mx_col) {
                                 tile = tileRegistry->of(tid = map->getOrDefault({xx-di, zz+o}));
                                 if (tile != nullptr && tile->blocksLight) {
                                     mx_col = true;
-                                } else {
-                                    addLight(xx-di, y, zz+o, lightValueC, light->r, light->g, light->b);
                                 }
+                                addLight(xx-di, y, zz+o, lightValue, light->r, light->g, light->b);
                             }
                         }
                     }
@@ -276,7 +275,7 @@ static void _GenerateMesh(TileArray* map, LightMap* lmap, MapTileRegistry* tileR
             if (tile == nullptr) {
                 continue;
             }
-            Color l = lmap->get({x, z});
+            LightMapEntry l = lmap->get({x, z});
             unsigned short tid;
             for (char fi=0; fi<6; fi++) {
                 if (fi == 0) {
@@ -291,24 +290,29 @@ static void _GenerateMesh(TileArray* map, LightMap* lmap, MapTileRegistry* tileR
                         if (tile2->wall > 0) {
                             continue;
                         }
+                        l = lmap->get({x-1, z});
                     } else if (fi==2 && x < map->width()-1) {
                         tile2 = tileRegistry->of(map->get({x+1, z}));
                         if (tile2->wall > 0) {
                             continue;
                         }
+                        l = lmap->get({x+1, z});
                     } else if (fi==5 && z > 0) {
                         tile2 = tileRegistry->of(map->get({x, z-1}));
                         if (tile2->wall > 0) {
                             continue;
                         }
+                        l = lmap->get({x, z-1});
                     } else if (fi==4 && z < map->height()-1) {
                         tile2 = tileRegistry->of(map->get({x, z+1}));
                         if (tile2->wall > 0) {
                             continue;
                         }
+                        l = lmap->get({x, z+1});
                     }
                 }
                 if (tid > 0) {
+                    unsigned char lv = l.v / (1 + l.n);
                     char fo = fi*3*4;
                     for (char j=0; j<4; j++) {
                         // TraceLog(LOG_INFO, "vertex %d, %d, %d [%u]",
@@ -316,11 +320,11 @@ static void _GenerateMesh(TileArray* map, LightMap* lmap, MapTileRegistry* tileR
                         verts->append(
                             (vertexnumbers[j] << 30) | // Vertex number
                             (cubeverts[fo + j*3 + 1]<<29) | // Y position
-                            (l.a << 16) | // todo: light levels
+                            (lv << 16) | // todo: light levels
                             ((cubeverts[fo + j*3 + 0] + x)<<8) | // X position
                             ((cubeverts[fo + j*3 + 2] + z)<<0) // Z position
                         );
-                        verts->append(tid | ((l.r&0xF)<<20) | ((l.g&0xF)<<16) | ((l.b&0xF)<<12)); // Tile ID and tint
+                        verts->append(tid | ((l.r&0xF0)<<16) | ((l.g&0xF0)<<12) | ((l.b&0xF0)<<8)); // Tile ID and tint
                     }
                     for (char j=0; j<6; j++) {
                         // TraceLog(LOG_INFO, "index %d", mi+I[j]);
@@ -360,7 +364,8 @@ void MapData::GenerateMesh() {
             mesh->verts = vertarrays[i]->collapse();
             mesh->triangleCount = indexarrays[i]->length() / 3;
             mesh->indices = indexarrays[i]->collapse();
-            TraceLog(LOG_INFO, "Generated level mesh with %u verts and %u triangles.", mesh->vertexCount, mesh->triangleCount);
+            TraceLog(LOG_INFO, "Generated level mesh #%llu with %u verts and %u triangles.",
+                i, mesh->vertexCount, mesh->triangleCount);
             delete vertarrays[i];
             delete indexarrays[i];
         }
@@ -418,11 +423,11 @@ unsigned short MapData::get(Vector3 pos) {
 }
 unsigned short MapData::get(int x, int y, int z) {
     for (size_t i=0; i<maps.length(); i++) {
-        Vector3 p = positions[i];
+        Vec3I p = positions[i];
         if (x >= p.x && y == p.y && z >= p.z) {
             TileArray& map = maps[i];
             if (x-p.x < map.width() && z-p.z < map.height()) {
-                return map[{x-(int)p.x, z-(int)p.z}];
+                return map[{x-p.x, z-p.z}];
             }
         }
     }
@@ -432,13 +437,13 @@ unsigned short MapData::get(int x, int y, int z) {
 
 #pragma region setLight()
 void MapData::setLight(Vector3 pos, unsigned char v, unsigned char r, unsigned char g, unsigned char b) {
-    Color* l = getLight(pos);
+    LightMapEntry* l = getLight(pos);
     if (l != nullptr) {
         *l = {r, g, b, v};
     }
 }
 void MapData::setLight(int x, int y, int z, unsigned char v, unsigned char r, unsigned char g, unsigned char b) {
-    Color* l = getLight(x, y, z);
+    LightMapEntry* l = getLight(x, y, z);
     if (l != nullptr) {
         *l = {r, g, b, v};
     }
@@ -446,12 +451,12 @@ void MapData::setLight(int x, int y, int z, unsigned char v, unsigned char r, un
 #pragma endregion
 
 #pragma region getLight()
-Color* MapData::getLight(Vector3 pos) {
+LightMapEntry* MapData::getLight(Vector3 pos) {
     return getLight(pos.x, pos.y, pos.z);
 }
-Color* MapData::getLight(int x, int y, int z) {
+LightMapEntry* MapData::getLight(int x, int y, int z) {
     for (size_t i=0; i<lightmaps.length(); i++) {
-        Vector3 p = positions[i];
+        Vec3I p = positions[i];
         if (x >= p.x && y == p.y && z >= p.z) {
             LightMap* map = lightmaps[i];
             if (x-p.x < map->width() && z-p.z < map->height()) {
@@ -464,30 +469,29 @@ Color* MapData::getLight(int x, int y, int z) {
 #pragma endregion
 
 #pragma region addLight()
-void MapData::addLight(int x, int y, int z, unsigned char v, unsigned char r, unsigned char g, unsigned char b) {
-    Color* c = getLight(x, y, z);
+void MapData::addLight(int x, int y, int z, unsigned int v, unsigned char r, unsigned char g, unsigned char b) {
+    LightMapEntry* c = getLight(x, y, z);
     if (c != nullptr) {
+        unsigned char n = c->n + 1;
         unsigned short rs = r;
         unsigned short gs = g;
         unsigned short bs = b;
-        unsigned short vs = v;
-        r = (rs * c->r) >> 8;
-        g = (gs * c->g) >> 8;
-        b = (bs * c->b) >> 8;
-        v = (vs * c->a) >> 8;
-        if (r > 255) r = 255;
-        if (g > 255) g = 255;
-        if (b > 255) b = 255;
-        if (v > 255) v = 255;
-        *c = {r, g, b, v};
+        rs = (rs * c->r) >> 8;
+        gs = (gs * c->g) >> 8;
+        bs = (bs * c->b) >> 8;
+        if (rs > 255) rs = 255;
+        if (gs > 255) gs = 255;
+        if (bs > 255) bs = 255;
+        r = rs; g = gs; b = bs;
+        // TraceLog(LOG_INFO, "Added light to %d,%d,%d. New Light: %u/%u 0x%02X%02X%02X", x, y, z, c->v, n+1, r, g, b);
+        *c = {r, g, b, n, v+c->v};
     }
 }
 #pragma endregion
 
 #pragma region ShouldRenderMap
 bool MapData::ShouldRenderMap(Vector3 pos, size_t mapno) {
-    TileArray& map = maps[mapno];
-    float d = Vector3Distance(pos, {positions[mapno].x, positions[mapno].y, positions[mapno].z});
+    float d = Vector3Distance(pos, {(float)positions[mapno].x, (float)positions[mapno].y, (float)positions[mapno].z});
     return d < renderDistance;
 }
 #pragma endregion

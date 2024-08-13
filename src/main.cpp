@@ -44,9 +44,11 @@ void _logprint(int logLevel, const char* text, va_list args) {
 	}
 	len = snprintf((char*)buffer, sizeof(buffer), "[%s] ", logLevels[logLevel].c_str());
 	__log_fd.write(buffer, len);
+	// printf("%s", buffer);
 	len = vsnprintf((char*)buffer, sizeof(buffer), text, args);
 	__log_fd.write(buffer, len);
 	__log_fd.put('\n');
+	// printf("%s\n", buffer);
 }
 
 void logprint(int logLevel, const char* text, ...) {

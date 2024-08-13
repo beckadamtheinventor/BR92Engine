@@ -5,11 +5,10 @@
 #include "Registry.hpp"
 #include "TextureRegistry.hpp"
 #include "Buffer.hpp"
+#include "Vec3.hpp"
 
 #include "raylib.h"
 #include "rlgl.h"
-#include "raymath.h"
-#include "raymath.h"
 #include "external/glad.h"
 
 #pragma region Defines
@@ -18,7 +17,7 @@
 // "LARG"
 #define LARGE_MAP_MAGIC_NUMBER       0x4752414C
 
-#define LIGHT_RANGE 8
+#define LIGHT_RANGE 6
 
 #pragma endregion
 
@@ -77,16 +76,20 @@ class TileArray : public Array2D<unsigned short> {
 #pragma endregion
 
 #pragma region LightMap
-class LightMap : public Array2D<Color> {
+struct LightMapEntry {
+    unsigned char r, g, b, n;
+    unsigned int v;
+};
+class LightMap : public Array2D<LightMapEntry> {
     public:
     LightMap() {}
     LightMap(int width, int height) {
         w = width;
         h = height;
         l = w * h;
-        values = new Color[l];
+        values = new LightMapEntry[l];
         for (size_t i=0; i<l; i++) {
-            values[i] = {255, 255, 255, 255};
+            values[i] = {255, 255, 255, 0, 0};
         }
     }
 };
@@ -108,7 +111,7 @@ struct HitInfo {
 
 #pragma region MapData
 class MapData {
-    DynamicArray<Vector3> positions;
+    DynamicArray<Vec3I> positions;
     DynamicArray<TileArray> maps;
     DynamicArray<IntMesh*> meshes;
     DynamicArray<LightMap*> lightmaps;
@@ -135,9 +138,9 @@ class MapData {
     unsigned short get(int x, int y, int z);
     void setLight(Vector3 pos, unsigned char v, unsigned char r, unsigned char g, unsigned char b);
     void setLight(int x, int y, int z, unsigned char v, unsigned char r, unsigned char g, unsigned char b);
-    Color* getLight(Vector3 pos);
-    Color* getLight(int x, int y, int z);
-    void addLight(int x, int y, int z, unsigned char v, unsigned char r, unsigned char g, unsigned char b);
+    LightMapEntry* getLight(Vector3 pos);
+    LightMapEntry* getLight(int x, int y, int z);
+    void addLight(int x, int y, int z, unsigned int v, unsigned char r, unsigned char g, unsigned char b);
     bool ShouldRenderMap(Vector3 pos, size_t mapno);
     void Draw(Vector3 camerapos);
     void SetFog(float fogMin, float fogMax, float* fogColor);
