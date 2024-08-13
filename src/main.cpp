@@ -3,11 +3,9 @@
 #include <cstdarg>
 #include <fstream>
 
-#pragma region imgui
 #include "imgui.h"
 #include "rlImGui.h"
 #include "imguiThemes.h"
-#pragma endregion
 
 #include "SimpleConfig.hpp"
 #include "AssetPath.hpp"
@@ -15,10 +13,10 @@
 #include "TextureRegistry.hpp"
 #include "Json.hpp"
 
-#define PLAYER_SPEED 10.0f
+#define PLAYER_SPEED 7.0f
 
 const char* MAIN_CONFIG_FILE = "config.dat";
-const char* SHADER_CONFIG_FILE = "shader.dat";
+const char* SHADER_CONFIG_FILE = "assets/shaders/cfg.dat";
 const char* VERSION_STRING = "0.0.1-indev";
 
 TextureRegistry GlobalTextureRegistry;
@@ -26,8 +24,8 @@ MapTileRegistry GlobalMapTileRegistry;
 
 using namespace SimpleConfig;
 
+#pragma region Helper Functions
 std::ofstream __log_fd;
-
 void _logprint(int logLevel, const char* text, va_list args) {
 	static std::string logLevels[] = {
 		"",
@@ -95,12 +93,16 @@ size_t fstreamlen(std::fstream& fd) {
 	fd.seekg(0, std::ios::beg);
 	return count;
 }
+#pragma endregion
 
+#pragma region main()
 int main(void)
 {
 	std::ifstream infd;
 	char* datastr;
 	SetTraceLogCallback(_logprint);
+
+#pragma region Config Init/Load
 	// initialize main config object and set defaults
 	Config *cfg = new Config();
 	cfg->add("ConfigVersion", Value::fromString(VERSION_STRING));
@@ -139,12 +141,15 @@ int main(void)
 
 	// Load shader config from file
 	scfg->deserialize(SHADER_CONFIG_FILE);
+#pragma endregion
 
+#pragma region Map Tile Registry
 	// load map tiles into registry
 	RegisteredTexture* nonetex = GlobalTextureRegistry.add("none");
 	MapTile* tile = GlobalMapTileRegistry.add("none");
 	tile->floor = tile->ceiling = tile->wall = nonetex->id;
 	tile->flags = 0;
+	tile->light = tile->tintr = tile->tintg = tile->tintb = 0;
 
 	infd.open(AssetPath::root("textures", "json"));
 	if (infd.is_open()) {
@@ -346,10 +351,12 @@ int main(void)
 	} else {
 		MissingAssetError(AssetPath::root("index", nullptr));
 	}
+#pragma endregion
 
+#pragma region Map Data Loading
 	MapData map;
-	map.TextureRegistry(&GlobalTextureRegistry);
-	map.TileRegistry(&GlobalMapTileRegistry);
+	map.SetTextureRegistry(&GlobalTextureRegistry);
+	map.SetTileRegistry(&GlobalMapTileRegistry);
 	RBuffer<char> readbuf;
 	readbuf.open(AssetPath::level(datastr));
 	if (readbuf.available() > 0) {
@@ -360,10 +367,10 @@ int main(void)
 		MissingAssetError(AssetPath::level(datastr));
 	}
 	delete [] datastr;
+#pragma endregion
 
-
+#pragma region Window Creation
 	SetConfigFlags(FLAG_WINDOW_RESIZABLE);
-
 	InitWindow(320, 240, "TheBackrooms1992");
 
 	size_t win_w = cfg->getUnsigned("WindowSizeX");
@@ -397,8 +404,9 @@ int main(void)
 	SetWindowMinSize(320, 240);
 	SetTargetFPS(targetFps);
 	SetExitKey(-1);
+#pragma endregion
 
-#pragma region imgui
+#pragma region ImGui Setup
 	rlImGuiSetup(true);
 
 	//you can use whatever imgui theme you like!
@@ -423,6 +431,7 @@ int main(void)
 
 #pragma endregion
 
+#pragma region Mesher Init
 	RenderTexture2D gameTexture = LoadRenderTexture(1920, 1080);
 
 	map.BuildAtlas();
@@ -431,6 +440,9 @@ int main(void)
 	map.GenerateMesh();
 	map.UploadMap();
 
+#pragma endregion
+
+#pragma region Camera Setup
 	Camera3D camera = {
 		{0,1.0,0},
 		{1.6, 0, 0},
@@ -458,6 +470,10 @@ int main(void)
 	map.fogMax = scfg->getDouble("FogMax");
 	map.lightLevel = scfg->getDouble("LightLevel");
 
+#pragma endregion
+
+#pragma region Main Loop
+
 	io_imgui.WantCaptureKeyboard = false;
 	io_imgui.WantCaptureMouse = false;
 
@@ -467,6 +483,7 @@ int main(void)
 
 	while (!WindowShouldClose())
 	{
+#pragma region Begin Drawing
 		BeginDrawing();
 		ClearBackground(BLACK);
 
@@ -500,14 +517,15 @@ int main(void)
 
 		EndTextureMode();
 
-	#pragma region imgui
 		rlImGuiBegin();
 
 		// ImGui::PushStyleColor(ImGuiCol_WindowBg, {});
 		// ImGui::PushStyleColor(ImGuiCol_DockingEmptyBg, {});
 		// ImGui::DockSpaceOverViewport(ImGui::GetMainViewport());
 		// ImGui::PopStyleColor(2);
+#pragma endregion
 
+#pragma region UI: GameWindow
 		/* Game Window */
 		{
 			ImGui::Begin("Game View", nullptr, ImGuiViewportFlags_NoRendererClear|ImGuiWindowFlags_NoCollapse);
@@ -530,8 +548,9 @@ int main(void)
 			rlImGuiImageRenderTextureFit(&gameTexture, true);
 			ImGui::End();
 		}
+#pragma endregion
 
-
+#pragma region UI: Config
 		/* Configuration window */
 		{
 			ImGui::Begin("Config");
@@ -553,7 +572,9 @@ int main(void)
 			if (ImGui::SliderFloat("Render Distance", &map.renderDistance, 10.0f, 200.0f)) {}
 			ImGui::End();
 		}
+#pragma endregion
 
+#pragma region UI: Shader CFG
 		/* Shader Config Menu */
 		{
 			ImGui::Begin("Shader Config");
@@ -563,7 +584,9 @@ int main(void)
 			if (ImGui::InputFloat("Light", &map.lightLevel)) {}
 			ImGui::End();
 		}
+#pragma endregion
 
+#pragma region End Drawing
 		rlImGuiEnd();
 
 		if (io_imgui.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
@@ -571,12 +594,12 @@ int main(void)
 			ImGui::UpdatePlatformWindows();
 			ImGui::RenderPlatformWindowsDefault();
 		}
-	#pragma endregion
 
 		EndDrawing();
+#pragma endregion
 
+#pragma region Handle Inputs
 		float dt = GetFrameTime();
-
 		if (!cursor_enabled) {
 			Vector3 movement = {0, 0, 0};
 			Vector2 mouseDelta = GetMouseDelta();
@@ -610,19 +633,17 @@ int main(void)
 				EnableCursor();
 			}
 		}
+#pragma endregion
 
 		is_first_frame = false;
 	}
 
-
-#pragma region imgui
-	rlImGuiShutdown();
 #pragma endregion
 
-
-
+	rlImGuiShutdown();
 	CloseWindow();
 
+#pragma region Save Configs
 	Vector2 windowPos = GetWindowPosition();
 	cfg->setBool("WindowMaximized", IsWindowMaximized());
 	cfg->setBool("WindowFullscreen", IsWindowFullscreen());
@@ -653,7 +674,9 @@ int main(void)
 	scfg->setDouble("FogMax", map.fogMax);
 	scfg->setDouble("LightLevel", map.lightLevel);
 	scfg->serialize(SHADER_CONFIG_FILE);
+#pragma endregion
 
 	__log_fd.close();
 	return 0;
 }
+#pragma endregion

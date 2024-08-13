@@ -12,6 +12,7 @@
 #include "raymath.h"
 #include "external/glad.h"
 
+#pragma region Defines
 // "SECT"
 #define SECTIONED_MAP_MAGIC_NUMBER   0x54434553
 // "LARG"
@@ -19,6 +20,9 @@
 
 #define LIGHT_RANGE 8
 
+#pragma endregion
+
+#pragma region IntMesh
 class IntMesh {
     public:
     unsigned int vertexCount = 0;
@@ -28,13 +32,17 @@ class IntMesh {
     unsigned int* verts = nullptr;
     unsigned short* indices = nullptr;
 };
+#pragma endregion
 
+#pragma region PlacedLight
 class PlacedLight {
     public:
     int x, y, z;
     unsigned char v, r, g, b;
 };
+#pragma endregion
 
+#pragma region MapTile
 class MapTile {
     public:
     unsigned short id;
@@ -50,9 +58,13 @@ class MapTile {
     unsigned char light, tintr, tintg, tintb;
     unsigned short floor, ceiling, wall;
 };
+#pragma endregion
 
+#pragma region MapTileRegistry
 class MapTileRegistry : public Registry<MapTile> {};
+#pragma endregion
 
+#pragma region TileArray
 class TileArray : public Array2D<unsigned short> {
     public:
     unsigned short getOrDefault(ArrayIndex i, unsigned short d=0) {
@@ -62,7 +74,9 @@ class TileArray : public Array2D<unsigned short> {
         return d;
     }
 };
+#pragma endregion
 
+#pragma region LightMap
 class LightMap : public Array2D<Color> {
     public:
     LightMap() {}
@@ -76,7 +90,9 @@ class LightMap : public Array2D<Color> {
         }
     }
 };
+#pragma endregion
 
+#pragma region HitInfo
 struct HitInfo {
     unsigned short tileid;
     union {
@@ -88,7 +104,9 @@ struct HitInfo {
         };
     };
 };
+#pragma endregion
 
+#pragma region MapData
 class MapData {
     DynamicArray<Vector3> positions;
     DynamicArray<TileArray> maps;
@@ -106,82 +124,22 @@ class MapData {
     void InitMesher(unsigned int depthTextureId);
     bool LoadMap(RBuffer<char>& data);
     bool LoadMapSection(RBuffer<char>& data);
-    Vector3 rayCast(Vector3 pos, Vector3 dir, HitInfo& hit, size_t max_steps=100);
+    Vector3 RayCast(Vector3 pos, Vector3 dir, HitInfo& hit, size_t max_steps=100);
     void GenerateMesh();
     void BuildLighting();
     void UploadMap(size_t mapno);
-    void UploadMap() {
-        for (size_t i=0; i<meshes.length(); i++) {
-            UploadMap(i);
-        }
-    }
-    void TileRegistry(MapTileRegistry* reg) {
-        tileRegistry = reg;
-    }
-    void TextureRegistry(TextureRegistry* reg) {
-        textureRegistry = reg;
-    }
-    unsigned short get(Vector3 pos) {
-        return get(pos.x, pos.y, pos.z);
-    }
-    unsigned short get(int x, int y, int z) {
-        for (size_t i=0; i<maps.length(); i++) {
-            Vector3 p = positions[i];
-            if (x >= p.x && y == p.y && z >= p.z) {
-                TileArray& map = maps[i];
-                if (x-p.x < map.width() && z-p.z < map.height()) {
-                    return map[{x-(int)p.x, z-(int)p.z}];
-                }
-            }
-        }
-        return 0;
-    }
-    void setLight(Vector3 pos, unsigned char v, unsigned char r, unsigned char g, unsigned char b) {
-        Color* l = getLight(pos);
-        if (l != nullptr) {
-            *l = {r, g, b, v};
-        }
-    }
-    void setLight(int x, int y, int z, unsigned char v, unsigned char r, unsigned char g, unsigned char b) {
-        Color* l = getLight(x, y, z);
-        if (l != nullptr) {
-            *l = {r, g, b, v};
-        }
-    }
-    Color* getLight(Vector3 pos) {
-        return getLight(pos.x, pos.y, pos.z);
-    }
-    Color* getLight(int x, int y, int z) {
-        for (size_t i=0; i<lightmaps.length(); i++) {
-            Vector3 p = positions[i];
-            if (x >= p.x && y == p.y && z >= p.z) {
-                LightMap* map = lightmaps[i];
-                if (x-p.x < map->width() && z-p.z < map->height()) {
-                    return &map->get({x-(int)p.x, z-(int)p.z});
-                }
-            }
-        }
-        return nullptr;
-    }
-    void addLight(int x, int y, int z, unsigned char v, unsigned char r, unsigned char g, unsigned char b) {
-        Color* c = getLight(x, y, z);
-        if (c != nullptr) {
-            unsigned short rs = r;
-            unsigned short gs = g;
-            unsigned short bs = b;
-            unsigned short vs = v;
-            r = (rs * c->r) >> 8;
-            g = (gs * c->g) >> 8;
-            b = (bs * c->b) >> 8;
-            v = (vs * c->a) >> 8;
-            setLight(x, y, z, v, r, g, b);
-        }
-    }
-    bool ShouldRenderMap(Vector3 pos, size_t mapno) {
-        TileArray& map = maps[mapno];
-        float d = Vector3Distance(pos, {positions[mapno].x, positions[mapno].y, positions[mapno].z});
-        return d < renderDistance;
-    }
+    void UploadMap();
+    void SetTileRegistry(MapTileRegistry* reg);
+    void SetTextureRegistry(TextureRegistry* reg);
+    unsigned short get(Vector3 pos);
+    unsigned short get(int x, int y, int z);
+    void setLight(Vector3 pos, unsigned char v, unsigned char r, unsigned char g, unsigned char b);
+    void setLight(int x, int y, int z, unsigned char v, unsigned char r, unsigned char g, unsigned char b);
+    Color* getLight(Vector3 pos);
+    Color* getLight(int x, int y, int z);
+    void addLight(int x, int y, int z, unsigned char v, unsigned char r, unsigned char g, unsigned char b);
+    bool ShouldRenderMap(Vector3 pos, size_t mapno);
     void Draw(Vector3 camerapos);
     void SetFog(float fogMin, float fogMax, float* fogColor);
 };
+#pragma endregion
