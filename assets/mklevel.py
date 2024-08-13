@@ -37,6 +37,8 @@ if __name__=='__main__':
 		if len(line):
 			data.append([int(c) for c in line.split(",")])
 	
+	data.reverse()
+	
 	try:
 		x,y,z = [int(c) for c in sys.argv[3].split(",")]
 	except Exception as e:

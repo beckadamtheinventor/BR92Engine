@@ -14,6 +14,7 @@ struct ArrayIndex {
 
 template<class T>
 class Array2D {
+    protected:
     int w, h;
     size_t l;
     T* values;

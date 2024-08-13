@@ -122,6 +122,7 @@ int main(void)
 	cfg->add("PlayerUX", Value::fromDouble(0));
 	cfg->add("PlayerUY", Value::fromDouble(1));
 	cfg->add("PlayerUZ", Value::fromDouble(0));
+	cfg->add("RenderDistance", Value::fromDouble(60));
 
 	// Load main config from file
 	cfg->deserialize(MAIN_CONFIG_FILE);
@@ -189,10 +190,12 @@ int main(void)
 						JsonFormatError("tiles.json", "Elements array contains invalid member (missing id)");
 					}
 					MapTile* tile = GlobalMapTileRegistry.add(id);
+					tile->light = 0;
 					if (o.has("f")) {
 						tile->isSpawnable = true;
 						tile->isSolid = false;
 						tile->isWall = false;
+						tile->blocksLight = false;
 						if (o["f"].getType() == JSON::Type::String) {
 							const char* f = o["f"].getCString();
 							if (GlobalTextureRegistry.has(f)) {
@@ -218,6 +221,7 @@ int main(void)
 					if (o.has("c")) {
 						tile->isSolid = false;
 						tile->isWall = false;
+						tile->blocksLight = false;
 						if (o["c"].getType() == JSON::Type::String) {
 							const char* f = o["c"].getCString();
 							if (GlobalTextureRegistry.has(f)) {
@@ -237,12 +241,13 @@ int main(void)
 								JsonFormatError("tiles.json", "Elements array member contains out of bound tile id number", i);
 							}
 						} else {
-							JsonFormatError("tiles.json", "Elements array member contains invalid value for field", "c");
+							JsonFormatError("tiles.json", "Elements array member contains invalid value type for field", "c");
 						}
 					}
 					if (o.has("w")) {
 						tile->isWall = true;
 						tile->isSolid = true;
+						tile->blocksLight = true;
 						if (o["w"].getType() == JSON::Type::String) {
 							const char* f = o["w"].getCString();
 							if (GlobalTextureRegistry.has(f)) {
@@ -262,29 +267,65 @@ int main(void)
 								JsonFormatError("tiles.json", "Elements array member contains out of bound tile id number", i);
 							}
 						} else {
-							JsonFormatError("tiles.json", "Elements array member contains invalid value for field", "w");
+							JsonFormatError("tiles.json", "Elements array member contains invalid value type (should be integer or string) for field", "w");
 						}
 					}
 					if (o.has("solid")) {
 						if (o["solid"].getType() == JSON::Type::Boolean) {
 							tile->isSolid = o["solid"].getBoolean();
 						} else {
-							JsonFormatError("tiles.json", "Elements array member contains invalid value for field", "solid");
+							JsonFormatError("tiles.json", "Elements array member contains invalid value type (should be bool) for field", "solid");
 						}
 					}
 					if (o.has("spawnable")) {
 						if (o["spawnable"].getType() == JSON::Type::Boolean) {
 							tile->isSpawnable = o["spawnable"].getBoolean();
 						} else {
-							JsonFormatError("tiles.json", "Elements array member contains invalid value for field", "spawnable");
+							JsonFormatError("tiles.json", "Elements array member contains invalid value type (should be bool) for field", "spawnable");
 						}
 					}
 					if (o.has("wall")) {
 						if (o["wall"].getType() == JSON::Type::Boolean) {
 							tile->isSolid = o["wall"].getBoolean();
 						} else {
-							JsonFormatError("tiles.json", "Elements array member contains invalid value for field", "wall");
+							JsonFormatError("tiles.json", "Elements array member contains invalid value type (should be bool) for field", "wall");
 						}
+					}
+					if (o.has("blockslight")) {
+						if (o["blockslight"].getType() == JSON::Type::Boolean) {
+							tile->blocksLight = o["blockslight"].getBoolean();
+						} else {
+							JsonFormatError("tiles.json", "Elements array member contains invalid value type (should be bool) for field", "blockslight");
+						}
+					}
+					if (o.has("light")) {
+						if (o["light"].getType() == JSON::Type::Integer) {
+							tile->light = o["light"].getInteger();
+						} else {
+							JsonFormatError("tiles.json", "Elements array mamber contains invalid value type (should be integer) for field", "light");
+						}
+					}
+					if (o.has("tint")) {
+						if (o["tint"].getType() == JSON::Type::Array) {
+							JSON::JSONArray& arr = o["tint"].getArray();
+							if (arr.length != 3) {
+								JsonFormatError("tiles.json", "Elements array member conatins invalid value type (should be 3-component integer array) for field", "tint");
+							}
+							if (arr.members[0].getType() != JSON::Type::Integer ||
+								arr.members[1].getType() != JSON::Type::Integer ||
+								arr.members[2].getType() != JSON::Type::Integer) {
+									JsonFormatError("tiles.json", "Elements array member conatins invalid value type (should be 3-component integer array) for field", "tint");
+							}
+							tile->tintr = arr.members[0].getInteger();
+							tile->tintg = arr.members[1].getInteger();
+							tile->tintb = arr.members[2].getInteger();
+						} else {
+							JsonFormatError("tiles.json", "Elements array mamber contains invalid value type (should be 3-component integer array) for field", "tint");
+						}
+					} else {
+						tile->tintr = 255;
+						tile->tintg = 255;
+						tile->tintb = 255;
 					}
 				}
 			}
@@ -307,6 +348,8 @@ int main(void)
 	}
 
 	MapData map;
+	map.TextureRegistry(&GlobalTextureRegistry);
+	map.TileRegistry(&GlobalMapTileRegistry);
 	RBuffer<char> readbuf;
 	readbuf.open(AssetPath::level(datastr));
 	if (readbuf.available() > 0) {
@@ -382,10 +425,9 @@ int main(void)
 
 	RenderTexture2D gameTexture = LoadRenderTexture(1920, 1080);
 
-	map.TextureRegistry(&GlobalTextureRegistry);
-	map.TileRegistry(&GlobalMapTileRegistry);
 	map.BuildAtlas();
 	map.InitMesher(gameTexture.depth.id);
+	map.BuildLighting();
 	map.GenerateMesh();
 	map.UploadMap();
 
@@ -406,6 +448,7 @@ int main(void)
 	camera.up.x = cfg->getDouble("PlayerUX");
 	camera.up.y = cfg->getDouble("PlayerUY");
 	camera.up.z = cfg->getDouble("PlayerUZ");
+	map.renderDistance = cfg->getDouble("RenderDistance");
 
 	map.fogColor[0] = scfg->getDouble("FogColorR");
 	map.fogColor[1] = scfg->getDouble("FogColorG");
@@ -420,6 +463,7 @@ int main(void)
 
 	bool cursor_enabled = true;
 	bool is_first_frame = true;
+	ImVec2 gameWindowPosition;
 
 	while (!WindowShouldClose())
 	{
@@ -427,7 +471,15 @@ int main(void)
 		ClearBackground(BLACK);
 
 		BeginTextureMode(gameTexture);
-		ClearBackground(BLACK);
+		{
+			Color tmp = {
+				(unsigned char)(map.fogColor[0]*255.0f),
+				(unsigned char)(map.fogColor[1]*255.0f),
+				(unsigned char)(map.fogColor[2]*255.0f),
+				(unsigned char)(map.fogColor[3]*255.0f)
+			};
+			ClearBackground(tmp);
+		}
 		BeginMode3D(camera);
 
 		map.Draw(camera.position);
@@ -459,6 +511,7 @@ int main(void)
 		/* Game Window */
 		{
 			ImGui::Begin("Game View", nullptr, ImGuiViewportFlags_NoRendererClear|ImGuiWindowFlags_NoCollapse);
+			gameWindowPosition = ImGui::GetWindowPos();
 			if (is_first_frame) {
 				ImGui::SetWindowSize({1920*0.75f, 1080*0.75f});
 				ImGui::SetWindowPos({0,0});
@@ -471,6 +524,8 @@ int main(void)
 					wsize.y = 128;
 				}
 				ImGui::SetWindowSize(wsize);
+				gameWindowPosition.x += wsize.x/2;
+				gameWindowPosition.y += wsize.y/2;
 			}
 			rlImGuiImageRenderTextureFit(&gameTexture, true);
 			ImGui::End();
@@ -487,11 +542,15 @@ int main(void)
 					SetTargetFPS(targetFps);
 				}
 			}
+			if (ImGui::Button("Unlimited")) {
+				targetFps = -1;
+				SetTargetFPS(-1);
+			}
 			if (ImGui::Checkbox("Fullscreen", &windowIsFullscreen)) {
 				ToggleFullscreen();
 			}
 			if (ImGui::SliderFloat("Mouse Sensitivity", &mouseSensitivity, 0.05f, 1.0f)) {}
-			
+			if (ImGui::SliderFloat("Render Distance", &map.renderDistance, 10.0f, 200.0f)) {}
 			ImGui::End();
 		}
 
@@ -504,9 +563,6 @@ int main(void)
 			if (ImGui::InputFloat("Light", &map.lightLevel)) {}
 			ImGui::End();
 		}
-
-
-
 
 		rlImGuiEnd();
 
@@ -524,6 +580,7 @@ int main(void)
 		if (!cursor_enabled) {
 			Vector3 movement = {0, 0, 0};
 			Vector2 mouseDelta = GetMouseDelta();
+			SetMousePosition(gameWindowPosition.x, gameWindowPosition.y);
 			float delta = PLAYER_SPEED*dt;
 			if (IsKeyDown(KEY_LEFT_CONTROL)) {
 				delta *= 1.4f;
@@ -585,6 +642,7 @@ int main(void)
 	cfg->setDouble("PlayerUX",  camera.up.x);
 	cfg->setDouble("PlayerUY",  camera.up.y);
 	cfg->setDouble("PlayerUZ",  camera.up.z);
+	cfg->setDouble("RenderDistance", map.renderDistance);
 	cfg->serialize(MAIN_CONFIG_FILE);
 
 	scfg->setDouble("FogColorR", map.fogColor[0]);

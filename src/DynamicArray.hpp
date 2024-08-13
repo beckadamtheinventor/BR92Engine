@@ -51,7 +51,7 @@ class DynamicArray {
                 delete items;
             }
             items = newitems;
-            alloc = len = size;
+            alloc = size;
         } else {
             delete items;
             items = nullptr;

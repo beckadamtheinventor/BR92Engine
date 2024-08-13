@@ -2,8 +2,6 @@
 #include "MapData.hpp"
 #include "AssetPath.hpp"
 #include "raylib.h"
-#include <functional>
-#include <ios>
 #include <thread>
 
 #define OpenGLDebug(s) if (GLenum e = glGetError()) printf("%s: OpenGL Error: %u\n", s, e)
@@ -97,12 +95,100 @@ bool MapData::LoadMapSection(RBuffer<char>& data) {
             }
             tid |= c << 8;
             map[{xx, zz}] = tid;
+            MapTile* tile = tileRegistry->of(tid);
+            if (tile != nullptr && tile->light > 0) {
+                lightList.append({x+xx, y, z+zz, tile->light, tile->tintr, tile->tintg, tile->tintb});
+            }
         }
     }
     maps.append(map);
     positions.append({(float)x, (float)y, (float)z});
-    meshes.append(new IntMesh{0});
+    lightmaps.append(new LightMap(sizeX, sizeZ));
+    meshes.append(new IntMesh());
     return true;
+}
+
+float inverseSquareRoot(float v) {
+	int32_t i;
+	float x2, y;
+	const float threehalfs = 1.5f;
+	y = v;
+	x2 = y * 0.5f;
+	i = *(int32_t*) &y; // evil floating point bit level hacking
+	i = 0x5f3759df - ( i >> 1 ); // what the fuck? 
+	y = *(float*) &i;
+	return y * (threehalfs - (x2*y*y)); // 1st iteration (Newton's method)
+}
+
+void MapData::BuildLighting() {
+    DynamicArray<int> heights;
+    for (size_t i=0; i<lightList.length(); i++) {
+        bool shouldAdd = true;
+        int y = lightList[i].y;
+        for (size_t j=0; j<heights.length(); j++) {
+            if (heights[j] == y) {
+                shouldAdd = false;
+            }
+        }
+        if (shouldAdd) {
+            heights.append(y);
+        }
+    }
+    for (size_t i=0; i<heights.length(); i++) {
+        int y = heights[i];
+        TileArray* map = &maps[i];
+        for (size_t j=0; j<lightList.length(); j++) {
+            if (lightList[j].y == y) {
+                PlacedLight* light = &lightList[j];
+                int xx = light->x;
+                int zz = light->z;
+                for (int o=-LIGHT_RANGE; o<=LIGHT_RANGE; o++) {
+                    bool px_col = false, pz_col = false, mx_col = false, mz_col = false;
+                    for (int di=1; di<=LIGHT_RANGE; di++) {
+                        float lightValueF = inverseSquareRoot((di*di + o*o) * 0.075f) * light->v;
+                        if (lightValueF > 255.0f) { lightValueF = 255.0f; }
+                        if (lightValueF < 0.0f) { lightValueF = 0.0f; }
+                        unsigned char lightValueC = lightValueF;
+                        if (lightValueC > 0) {
+                            MapTile* tile;
+                            if (!pz_col) {
+                                tile = tileRegistry->of(map->getOrDefault({xx+o, zz+di}));
+                                if (tile != nullptr && tile->blocksLight) {
+                                    pz_col = true;
+                                } else {
+                                    addLight(xx+o, y, zz+di, lightValueC, light->r, light->g, light->b);
+                                }
+                            }
+                            if (!mz_col) {
+                                tile = tileRegistry->of(map->getOrDefault({xx+o, zz-di}));
+                                if (tile != nullptr && tile->blocksLight) {
+                                    mz_col = true;
+                                } else {
+                                    addLight(xx+o, y, zz-di, lightValueC, light->r, light->g, light->b);
+                                }
+                            }
+                            if (!px_col) {
+                                tile = tileRegistry->of(map->getOrDefault({xx+di, zz+o}));
+                                if (tile != nullptr && tile->blocksLight) {
+                                    px_col = true;
+                                } else {
+                                    addLight(xx+di, y, zz+o, lightValueC, light->r, light->g, light->b);
+                                }
+                            }
+                            if (!mx_col) {
+                                tile = tileRegistry->of(map->getOrDefault({xx-di, zz+o}));
+                                if (tile != nullptr && tile->blocksLight) {
+                                    mx_col = true;
+                                } else {
+                                    addLight(xx-di, y, zz+o, lightValueC, light->r, light->g, light->b);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 Vector3 MapData::rayCast(Vector3 pos, Vector3 dir, HitInfo& hit, size_t max_steps) {
@@ -119,15 +205,15 @@ Vector3 MapData::rayCast(Vector3 pos, Vector3 dir, HitInfo& hit, size_t max_step
 
 static const constexpr char cubeverts[] = {
     // +y
+    1, 1, 1,
     0, 1, 1,
     0, 1, 0,
     1, 1, 0,
-    1, 1, 1,
     // -y
+    1, 0, 1,
     1, 0, 0,
     0, 0, 0,
     0, 0, 1,
-    1, 0, 1,
     // +x
     1, 0, 0,
     1, 1, 0,
@@ -164,9 +250,7 @@ static const constexpr char triangleindices[6] = {
     0, 1, 2, 0, 2, 3,
 };
 
-static void _GenerateMesh(IntMesh* mesh, TileArray* map, MapTileRegistry* tileRegistry) {
-    DynamicArray<unsigned int>* verts = new DynamicArray<unsigned int>();
-    DynamicArray<unsigned short>* indices = new DynamicArray<unsigned short>();
+static void _GenerateMesh(TileArray* map, LightMap* lmap, MapTileRegistry* tileRegistry, DynamicArray<unsigned int,0>* verts, DynamicArray<unsigned short,0>* indices) {
     unsigned int mi = 0;
     for (int z=0; z<map->height(); z++) {
         for (int x=0; x<map->width(); x++) {
@@ -174,6 +258,7 @@ static void _GenerateMesh(IntMesh* mesh, TileArray* map, MapTileRegistry* tileRe
             if (tile == nullptr) {
                 continue;
             }
+            Color l = lmap->get({x, z});
             unsigned short tid;
             for (char fi=0; fi<6; fi++) {
                 if (fi == 0) {
@@ -181,7 +266,29 @@ static void _GenerateMesh(IntMesh* mesh, TileArray* map, MapTileRegistry* tileRe
                 } else if (fi == 1) {
                     tid = tile->floor;
                 } else {
+                    MapTile* tile2;
                     tid = tile->wall;
+                    if (fi==3 && x > 0) {
+                        tile2 = tileRegistry->of(map->get({x-1, z}));
+                        if (tile2->wall > 0) {
+                            continue;
+                        }
+                    } else if (fi==2 && x < map->width()-1) {
+                        tile2 = tileRegistry->of(map->get({x+1, z}));
+                        if (tile2->wall > 0) {
+                            continue;
+                        }
+                    } else if (fi==5 && z > 0) {
+                        tile2 = tileRegistry->of(map->get({x, z-1}));
+                        if (tile2->wall > 0) {
+                            continue;
+                        }
+                    } else if (fi==4 && z < map->height()-1) {
+                        tile2 = tileRegistry->of(map->get({x, z+1}));
+                        if (tile2->wall > 0) {
+                            continue;
+                        }
+                    }
                 }
                 if (tid > 0) {
                     char fo = fi*3*4;
@@ -191,11 +298,11 @@ static void _GenerateMesh(IntMesh* mesh, TileArray* map, MapTileRegistry* tileRe
                         verts->append(
                             (vertexnumbers[j] << 30) | // Vertex number
                             (cubeverts[fo + j*3 + 1]<<29) | // Y position
-                            (0x7f << 16) | // todo: light levels
+                            (l.a << 16) | // todo: light levels
                             ((cubeverts[fo + j*3 + 0] + x)<<8) | // X position
                             ((cubeverts[fo + j*3 + 2] + z)<<0) // Z position
                         );
-                        verts->append(tid | (0xfff<<12)); // Tile ID and tint
+                        verts->append(tid | ((l.r&0xF)<<20) | ((l.g&0xF)<<16) | ((l.b&0xF)<<12)); // Tile ID and tint
                     }
                     for (char j=0; j<6; j++) {
                         // TraceLog(LOG_INFO, "index %d", mi+I[j]);
@@ -206,30 +313,36 @@ static void _GenerateMesh(IntMesh* mesh, TileArray* map, MapTileRegistry* tileRe
             }
         }
     }
-    if (mesh->verts != nullptr) {
-        delete[] mesh->verts;
-    }
-    if (mesh->indices != nullptr) {
-        delete[] mesh->indices;
-    }
-    mesh->vertexCount = verts->length() / 2;
-    mesh->verts = verts->collapse();
-    mesh->triangleCount = indices->length() / 3;
-    mesh->indices = indices->collapse();
-    delete verts;
-    delete indices;
-    TraceLog(LOG_INFO, "Generated level mesh with %u verts and %u triangles.", mesh->vertexCount, mesh->triangleCount);
 }
 
 void MapData::GenerateMesh() {
     std::thread threads[maps.length()];
+    DynamicArray<unsigned int, 0>* vertarrays[maps.length()];
+    DynamicArray<unsigned short, 0>* indexarrays[maps.length()];
     for (size_t i=0; i<maps.length(); i++) {
-        threads[i] = std::thread(_GenerateMesh, meshes[i], &maps[i], tileRegistry);
-        // _GenerateMesh(meshes[i], maps[i], tileRegistry);
+        vertarrays[i] = new DynamicArray<unsigned int, 0>();
+        indexarrays[i] = new DynamicArray<unsigned short, 0>();
+        vertarrays[i]->resize(maps[i].size()*6*4*2);
+        indexarrays[i]->resize(maps[i].size()*36);
+        threads[i] = std::thread(_GenerateMesh, &maps[i], lightmaps[i], tileRegistry, vertarrays[i], indexarrays[i]);
     }
     for (size_t i=0; i<maps.length(); i++) {
         if (threads[i].joinable()) {
             threads[i].join();
+            IntMesh* mesh = meshes[i];
+            if (mesh->verts != nullptr) {
+                delete mesh->verts;
+            }
+            if (mesh->indices != nullptr) {
+                delete mesh->indices;
+            }
+            mesh->vertexCount = vertarrays[i]->length() / 2;
+            mesh->verts = vertarrays[i]->collapse();
+            mesh->triangleCount = indexarrays[i]->length() / 3;
+            mesh->indices = indexarrays[i]->collapse();
+            TraceLog(LOG_INFO, "Generated level mesh with %u verts and %u triangles.", mesh->vertexCount, mesh->triangleCount);
+            delete vertarrays[i];
+            delete indexarrays[i];
         }
     }
 }
@@ -266,6 +379,7 @@ void MapData::Draw(Vector3 camerapos) {
     glBindTexture(GL_TEXTURE_2D, atlas.id);
     loc = GetShaderLocation(mainShader, "texture0");
     glUniform1i(loc, 0);
+    glEnable(GL_DEPTH_TEST);
     // glDisable(GL_CULL_FACE);
     // loc = GetShaderLocation(mainShader, "cameraPosition");
     // glUniform3f(loc, camerapos.x, camerapos.y, camerapos.z);

@@ -41,6 +41,6 @@ void main()
 
     // Send vertex attributes to fragment shader
     fragTexCoord = vec2(tx, ty);
-    lightLevel = light/128.0f;
+    lightLevel = light/256.0f;
     vertColor = vec4(float(ri)/15.0, float(gi)/15.0, float(bi)/15.0, 1.0);
 }

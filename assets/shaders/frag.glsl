@@ -31,6 +31,7 @@ void main()
     vec4 texelColor = texture(texture0, fragTexCoord);
     texelColor *= vertColor;
     float light = lightLevel * LightLevel;
-    finalColor = mix(texelColor * vec4(light, light, light, 1.0f), FogColor, alpha);
+    vec4 fogColor = vec4(FogColor.rgb, 1.0f);
+    finalColor = mix(texelColor * vec4(light, light, light, 1.0f), fogColor, alpha);
 }
 
