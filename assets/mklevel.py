@@ -1,6 +1,6 @@
 import os, sys
 
-CHUNKSIZE = 8
+CHUNKSIZE = 16
 
 def writeSection(binary, data, msx, msy, x, y, z, sx=0, sz=0, ex=-1, ez=-1):
 	shouldWrite = False
