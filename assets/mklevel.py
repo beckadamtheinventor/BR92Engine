@@ -1,8 +1,8 @@
 import os, sys
 
-CHUNKSIZE = 16
+CHUNKSIZE = 10
 
-def writeSection(binary, data, msx, msy, x, y, z, sx=0, sz=0, ex=-1, ez=-1):
+def writeTileSection(binary, data, msx, msy, x, y, z, sx=0, sz=0, ex=-1, ez=-1):
 	shouldWrite = False
 	for row in data[sz:ez]:
 		for col in row[sx:ex]:
@@ -10,6 +10,7 @@ def writeSection(binary, data, msx, msy, x, y, z, sx=0, sz=0, ex=-1, ez=-1):
 				shouldWrite = True
 	if not shouldWrite:
 		return
+	binary.extend([ord(c) for c in "TILE"])
 	binary.extend(list(x.to_bytes(4, 'little', signed=True)))
 	binary.extend(list(y.to_bytes(4, 'little', signed=True)))
 	binary.extend(list(z.to_bytes(4, 'little', signed=True)))
@@ -46,15 +47,14 @@ if __name__=='__main__':
 		exit(1)
 
 	binary = []
-	binary.extend([ord(c) for c in "SECT"])
 	width = len(data)
 	height = len(data[0])
 	if width > CHUNKSIZE or height > CHUNKSIZE:
 		for zz in range(0, height, CHUNKSIZE):
 			for xx in range(0, width, CHUNKSIZE):
-				writeSection(binary, data, CHUNKSIZE, CHUNKSIZE, x+xx, y, z+zz, xx, zz, min(xx+CHUNKSIZE, width), min(zz+CHUNKSIZE, height))
+				writeTileSection(binary, data, CHUNKSIZE, CHUNKSIZE, x+xx, y, z+zz, xx, zz, min(xx+CHUNKSIZE, width), min(zz+CHUNKSIZE, height))
 	else:
-		writeSection(binary, data, width, height, x, y, z)
+		writeTileSection(binary, data, width, height, x, y, z)
 
 	if os.path.exists(sys.argv[2]):
 		mode = "ab"

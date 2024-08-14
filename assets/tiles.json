@@ -51,8 +51,8 @@
 		{"id": "door1", "w": "door1"},
 		{"id": "door1sidewall", "w": "door1sidewall"},
 		{"id": "door1sidefloor", "c": "door1sidewall", "f": "door1sidewall"},
-		{"id": "ceiling1lampoff", "c": "ceiling1lampoff", "f": "floor1", "light": 20},
-		{"id": "ceiling2lampoff", "c": "ceiling2lampoff", "f": "floor2", "light": 20},
+		{"id": "ceiling1lampoff", "c": "ceiling1lampoff", "f": "floor1", "light": 20, "tint": [140, 140, 255]},
+		{"id": "ceiling2lampoff", "c": "ceiling2lampoff", "f": "floor2", "light": 20, "tint": [140, 140, 255]},
 		{"id": "ceiling1lamp_dummy", "c": "ceiling1lamp", "f": "floor1", "light": 180},
 		{"id": "ceiling2lamp_dummy", "c": "ceiling2lamp", "f": "floor2", "light": 200},
 	]

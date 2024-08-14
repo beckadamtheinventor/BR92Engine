@@ -35,6 +35,7 @@ project(BR92Engine)
 add_subdirectory(thirdparty/raylib-5.0)
 add_subdirectory(thirdparty/imgui-docking)
 add_subdirectory(thirdparty/rlImGui)
+add_subdirectory(thirdparty/openvr)
 
 
 # MY_SOURCES is defined to be a list of all the source files for my game 
@@ -78,7 +79,8 @@ if(MSVC) # If using the VS compiler...
 endif()
 
 target_include_directories("${CMAKE_PROJECT_NAME}" PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include/")
-
+target_include_directories("${CMAKE_PROJECT_NAME}" PUBLIC "C:\\Program Files (x86)\\OpenVRSDK\\include\\openvr")
+target_link_libraries("${CMAKE_PROJECT_NAME}" PUBLIC "C:\\Program Files (x86)\\OpenVRSDK\\lib")
 
 
 # Link raylib library statically, Here wou would add other libraries!

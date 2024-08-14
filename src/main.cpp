@@ -1,4 +1,5 @@
 #include "raylib.h"
+#include "raymath.h"
 #include "rcamera.h"
 #include <cstdarg>
 #include <fstream>
@@ -7,13 +8,14 @@
 #include "rlImGui.h"
 #include "imguiThemes.h"
 
+#include "VRInterface.hpp"
 #include "SimpleConfig.hpp"
 #include "AssetPath.hpp"
 #include "MapData.hpp"
 #include "TextureRegistry.hpp"
 #include "Json.hpp"
 
-#define PLAYER_SPEED 7.0f
+#define PLAYER_SPEED 2.0f
 
 const char* MAIN_CONFIG_FILE = "config.dat";
 const char* SHADER_CONFIG_FILE = "assets/shaders/cfg.dat";
@@ -118,9 +120,9 @@ int main(void)
 	cfg->add("MouseSensitivity", Value::fromDouble(0.1f));
 	cfg->add("FOVY", Value::fromDouble(60));
 	cfg->add("PlayerX", Value::fromDouble(0));
-	cfg->add("PlayerY", Value::fromDouble(1));
+	cfg->add("PlayerY", Value::fromDouble(PLAYER_HEIGHT));
 	cfg->add("PlayerZ", Value::fromDouble(0));
-	cfg->add("PlayerTX", Value::fromDouble(1.6));
+	cfg->add("PlayerTX", Value::fromDouble(0.75f));
 	cfg->add("PlayerTY", Value::fromDouble(0));
 	cfg->add("PlayerTZ", Value::fromDouble(0));
 	cfg->add("PlayerUX", Value::fromDouble(0));
@@ -481,6 +483,11 @@ int main(void)
 
 	bool cursor_enabled = true;
 	bool is_first_frame = true;
+	bool cheats_enabled = false;
+	bool freecam = false;
+	bool godmode = false;
+	bool noclip = false;
+	float player_speed = PLAYER_SPEED;
 	ImVec2 gameWindowPosition;
 
 	while (!WindowShouldClose())
@@ -588,6 +595,18 @@ int main(void)
 		}
 #pragma endregion
 
+#pragma region UI: Cheats
+	/* Cheats Menu */
+	if (cheats_enabled) {
+		ImGui::Begin("Cheats");
+		if (ImGui::Checkbox("Freecam", &freecam)) {}
+		if (ImGui::Checkbox("Noclip", &noclip)) {}
+		if (ImGui::Checkbox("Godmode", &godmode)) {}
+		if (ImGui::InputFloat("Speed", &player_speed)) {}
+		ImGui::End();
+	}
+#pragma endregion
+
 #pragma region End Drawing
 		rlImGuiEnd();
 
@@ -603,27 +622,45 @@ int main(void)
 #pragma region Handle Inputs
 		float dt = GetFrameTime();
 		if (!cursor_enabled) {
-			Vector3 movement = {0, 0, 0};
 			Vector2 mouseDelta = GetMouseDelta();
 			SetMousePosition(gameWindowPosition.x, gameWindowPosition.y);
-			float delta = PLAYER_SPEED*dt;
+			float delta = player_speed*dt;
 			if (IsKeyDown(KEY_LEFT_CONTROL)) {
-				delta *= 1.4f;
+				delta *= 1.5f;
 			}
+			Vector3 oldPosition = camera.position;
 			if (IsKeyDown(KEY_W)) {
-				CameraMoveForward(&camera, delta, true);
+				CameraMoveForward(&camera, delta, !freecam);
 			}
 			if (IsKeyDown(KEY_S)) {
-				CameraMoveForward(&camera, -delta, true);
+				CameraMoveForward(&camera, -delta, !freecam);
 			}
 			if (IsKeyDown(KEY_A)) {
-				CameraMoveRight(&camera, -delta, true);
+				CameraMoveRight(&camera, -delta, !freecam);
 			}
 			if (IsKeyDown(KEY_D)) {
-				CameraMoveRight(&camera, delta, true);
+				CameraMoveRight(&camera, delta, !freecam);
+			}
+			Vector3 movement = Vector3Subtract(camera.position, oldPosition);
+			if (freecam) {
+				if (IsKeyDown(KEY_Z)) {
+					CameraMoveUp(&camera, delta);
+				}
+				if (IsKeyDown(KEY_X)) {
+					CameraMoveUp(&camera, -delta);
+				}
+			} else {
+				Vector3 adjustedPosition = map.MoveTo(oldPosition, movement, noclip);
+				adjustedPosition = map.ApplyGravity(adjustedPosition, 0.5f*9.81f*dt);
+				Vector3 delta = Vector3Subtract(adjustedPosition, camera.position);
+				camera.position = Vector3Add(camera.position, delta);
+				camera.target = Vector3Add(camera.target, delta);
 			}
 			CameraYaw(&camera, -mouseDelta.x*dt*mouseSensitivity, false);
 			CameraPitch(&camera, -mouseDelta.y*dt*mouseSensitivity, true, false, false);
+			if (IsKeyPressed(KEY_ZERO)) {
+				cheats_enabled = !cheats_enabled;
+			}
 		}
 
 		if (IsKeyPressed(KEY_ESCAPE)) {

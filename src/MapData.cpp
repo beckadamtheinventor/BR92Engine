@@ -4,6 +4,7 @@
 #include "raylib.h"
 #include "raymath.h"
 #include "raymath.h"
+#include <cmath>
 #include <thread>
 
 #pragma region Const Data
@@ -58,7 +59,7 @@ static const constexpr char triangleindices[6] = {
 #pragma region Helper Functions
 #define OpenGLDebug(s) if (GLenum e = glGetError()) printf("%s: OpenGL Error: %u\n", s, e)
 
-static inline bool _readInt(RBuffer<char>& data, int& x) {
+bool _readInt(RBuffer<char>& data, int& x) {
     char c;
     if (!data.read(c)) {
         return false;
@@ -76,6 +77,19 @@ static inline bool _readInt(RBuffer<char>& data, int& x) {
         return false;
     }
     x |= c << 24;
+    return true;
+}
+
+bool _readShort(RBuffer<char>& data, int& x) {
+    char c;
+    if (!data.read(c)) {
+        return false;
+    }
+    x = c;
+    if (!data.read(c)) {
+        return false;
+    }
+    x |= c << 8;
     return true;
 }
 
@@ -111,27 +125,54 @@ void MapData::BuildAtlas() {
 }
 #pragma endregion
 
-#pragma region LoadMap()
+#pragma region LoadMapChunk()
 bool MapData::LoadMap(RBuffer<char>& data) {
+    do {
+        if (!LoadMapChunk(data)) {
+            return false;
+        }
+    } while (!data.eof());
+    return true;
+}
+#pragma endregion
+
+#pragma region LoadMapChunk()
+bool MapData::LoadMapChunk(RBuffer<char>& data) {
     int magic;
     if (!_readInt(data, magic)) {
         return false;
     }
-    if (magic == LARGE_MAP_MAGIC_NUMBER) {
-
-    } else if (magic == SECTIONED_MAP_MAGIC_NUMBER) {
-        do {
-            if (!MapData::LoadMapSection(data)) {
-                return false;
-            }
-        } while (!data.eof());
+    if (magic == WALL_MAP_MAGIC_NUMBER) {
+        if (!LoadMapWalls(data)) {
+            return false;
+        }
+    } else if (magic == TILE_MAP_MAGIC_NUMBER) {
+        if (!LoadMapTiles(data)) {
+            return false;
+        }
     }
     return true;
 }
 #pragma endregion
 
-#pragma region LoadMapSection()
-bool MapData::LoadMapSection(RBuffer<char>& data) {
+#pragma region LoadMapWalls()
+bool MapData::LoadMapWalls(RBuffer<char>& data) {
+    int x, y, z;
+    if (!_readInt(data, x)) {
+        return false;
+    }
+    if (!_readInt(data, y)) {
+        return false;
+    }
+    if (!_readInt(data, z)) {
+        return false;
+    }
+    return true;
+}
+#pragma endregion
+
+#pragma region LoadMapTile
+bool MapData::LoadMapTiles(RBuffer<char>& data) {
     TileArray map;
     int x, y, z;
     if (!_readInt(data, x)) {
@@ -176,7 +217,8 @@ bool MapData::LoadMapSection(RBuffer<char>& data) {
     maps.append(map);
     positions.append({x, y, z});
     lightmaps.append(new LightMap(sizeX, sizeZ));
-    meshes.append(new IntMesh());
+    intMeshes.append(new IntMesh());
+    TraceLog(LOG_INFO, "Loaded map #%llu at %d,%d,%d size %d,%d", maps.length(), x, y, z, sizeX, sizeZ);
     return true;
 }
 #pragma endregion
@@ -205,13 +247,13 @@ void MapData::BuildLighting() {
                 PlacedLight* light = &lightList[j];
                 int xx = light->x;
                 int zz = light->z;
-                addLight(xx, y, zz, light->v, light->r, light->g, light->b);
-                for (int o=-LIGHT_RANGE; o<=LIGHT_RANGE; o++) {
+                addLight(xx, y, zz, light->v*2.0f, light->r, light->g, light->b);
+                for (int di=1; di<=LIGHT_RANGE; di++) {
                     bool px_col = false, pz_col = false, mx_col = false, mz_col = false;
-                    addLight(xx+o, y, zz, light->v, light->r, light->g, light->b);
-                    addLight(xx, y, zz+o, light->v, light->r, light->g, light->b);
-                    for (int di=1; di<=LIGHT_RANGE; di++) {
-                        int lightValue = inverseSquareRoot((di*di*0.5f + o*o*0.5f) * 0.075f) * light->v;
+                    // addLight(xx+o, y, zz, light->v, light->r, light->g, light->b);
+                    // addLight(xx, y, zz+o, light->v, light->r, light->g, light->b);
+                    for (int o=-LIGHT_RANGE; o<=LIGHT_RANGE; o++) {
+                        float lightValue = inverseSquareRoot((di*di+o*o))*light->v;
                         if (lightValue > 0) {
                             MapTile* tile;
                             unsigned short tid;
@@ -249,6 +291,7 @@ void MapData::BuildLighting() {
             }
         }
     }
+    TraceLog(LOG_INFO, "Done building lights!");
 }
 #pragma endregion
 
@@ -287,32 +330,33 @@ static void _GenerateMesh(TileArray* map, LightMap* lmap, MapTileRegistry* tileR
                     tid = tile->wall;
                     if (fi==3 && x > 0) {
                         tile2 = tileRegistry->of(map->get({x-1, z}));
-                        if (tile2->wall > 0) {
+                        if (tile2==nullptr || tile2->wall > 0) {
                             continue;
                         }
                         l = lmap->get({x-1, z});
                     } else if (fi==2 && x < map->width()-1) {
                         tile2 = tileRegistry->of(map->get({x+1, z}));
-                        if (tile2->wall > 0) {
+                        if (tile2==nullptr || tile2->wall > 0) {
                             continue;
                         }
                         l = lmap->get({x+1, z});
                     } else if (fi==5 && z > 0) {
                         tile2 = tileRegistry->of(map->get({x, z-1}));
-                        if (tile2->wall > 0) {
+                        if (tile2==nullptr || tile2->wall > 0) {
                             continue;
                         }
                         l = lmap->get({x, z-1});
                     } else if (fi==4 && z < map->height()-1) {
                         tile2 = tileRegistry->of(map->get({x, z+1}));
-                        if (tile2->wall > 0) {
+                        if (tile2==nullptr || tile2->wall > 0) {
                             continue;
                         }
                         l = lmap->get({x, z+1});
                     }
                 }
                 if (tid > 0) {
-                    unsigned char lv = l.v / (1 + l.n);
+                    float ln = l.n>0 ? l.v/(0.5f*l.n) : 32;
+                    unsigned char lv = ln < 256 ? ln : 255;
                     char fo = fi*3*4;
                     for (char j=0; j<4; j++) {
                         // TraceLog(LOG_INFO, "vertex %d, %d, %d [%u]",
@@ -353,7 +397,7 @@ void MapData::GenerateMesh() {
     for (size_t i=0; i<maps.length(); i++) {
         if (threads[i].joinable()) {
             threads[i].join();
-            IntMesh* mesh = meshes[i];
+            IntMesh* mesh = intMeshes[i];
             if (mesh->verts != nullptr) {
                 delete mesh->verts;
             }
@@ -375,7 +419,7 @@ void MapData::GenerateMesh() {
 
 #pragma region UploadMap()
 void MapData::UploadMap(size_t mapno) {
-    IntMesh* mesh = meshes[mapno];
+    IntMesh* mesh = intMeshes[mapno];
     if (mesh->vao == 0) {
         glGenVertexArrays(1, &mesh->vao);
     }
@@ -399,7 +443,7 @@ void MapData::UploadMap(size_t mapno) {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 void MapData::UploadMap() {
-    for (size_t i=0; i<meshes.length(); i++) {
+    for (size_t i=0; i<intMeshes.length(); i++) {
         UploadMap(i);
     }
 }
@@ -419,7 +463,7 @@ void MapData::SetTextureRegistry(TextureRegistry* reg) {
 
 #pragma region get()
 unsigned short MapData::get(Vector3 pos) {
-    return get(pos.x, pos.y, pos.z);
+    return get(floorf(pos.x), floorf(pos.y), floorf(pos.z));
 }
 unsigned short MapData::get(int x, int y, int z) {
     for (size_t i=0; i<maps.length(); i++) {
@@ -436,16 +480,16 @@ unsigned short MapData::get(int x, int y, int z) {
 #pragma endregion
 
 #pragma region setLight()
-void MapData::setLight(Vector3 pos, unsigned char v, unsigned char r, unsigned char g, unsigned char b) {
+void MapData::setLight(Vector3 pos, float v, unsigned char r, unsigned char g, unsigned char b) {
     LightMapEntry* l = getLight(pos);
     if (l != nullptr) {
-        *l = {r, g, b, v};
+        *l = {r, g, b, 1, v};
     }
 }
-void MapData::setLight(int x, int y, int z, unsigned char v, unsigned char r, unsigned char g, unsigned char b) {
+void MapData::setLight(int x, int y, int z, float v, unsigned char r, unsigned char g, unsigned char b) {
     LightMapEntry* l = getLight(x, y, z);
     if (l != nullptr) {
-        *l = {r, g, b, v};
+        *l = {r, g, b, 1, v};
     }
 }
 #pragma endregion
@@ -469,10 +513,9 @@ LightMapEntry* MapData::getLight(int x, int y, int z) {
 #pragma endregion
 
 #pragma region addLight()
-void MapData::addLight(int x, int y, int z, unsigned int v, unsigned char r, unsigned char g, unsigned char b) {
+void MapData::addLight(int x, int y, int z, float v, unsigned char r, unsigned char g, unsigned char b) {
     LightMapEntry* c = getLight(x, y, z);
     if (c != nullptr) {
-        unsigned char n = c->n + 1;
         unsigned short rs = r;
         unsigned short gs = g;
         unsigned short bs = b;
@@ -483,7 +526,7 @@ void MapData::addLight(int x, int y, int z, unsigned int v, unsigned char r, uns
         if (gs > 255) gs = 255;
         if (bs > 255) bs = 255;
         r = rs; g = gs; b = bs;
-        // TraceLog(LOG_INFO, "Added light to %d,%d,%d. New Light: %u/%u 0x%02X%02X%02X", x, y, z, c->v, n+1, r, g, b);
+        unsigned char n = c->n + 1;
         *c = {r, g, b, n, v+c->v};
     }
 }
@@ -491,13 +534,21 @@ void MapData::addLight(int x, int y, int z, unsigned int v, unsigned char r, uns
 
 #pragma region ShouldRenderMap
 bool MapData::ShouldRenderMap(Vector3 pos, size_t mapno) {
-    float d = Vector3Distance(pos, {(float)positions[mapno].x, (float)positions[mapno].y, (float)positions[mapno].z});
+    float x = (float)positions[mapno].x + maps[mapno].width() * 0.5f;
+    float z = (float)positions[mapno].z + maps[mapno].height() * 0.5f;
+    float d = Vector3Distance(pos, {x, (float)positions[mapno].y, z});
+    if (maps[mapno].width() >= maps[mapno].height()) {
+        d -= maps[mapno].width();
+    } else {
+        d -= maps[mapno].height();
+    }
     return d < renderDistance;
 }
 #pragma endregion
 
+
 #pragma region Draw()
-void MapData::Draw(Vector3 camerapos) {
+void MapData::Draw(Vector3 camerapos, Matrix* mat) {
     unsigned int loc;
     glUseProgram(mainShader.id);
     glActiveTexture(GL_TEXTURE0);
@@ -508,12 +559,16 @@ void MapData::Draw(Vector3 camerapos) {
     // glDisable(GL_CULL_FACE);
     // loc = GetShaderLocation(mainShader, "cameraPosition");
     // glUniform3f(loc, camerapos.x, camerapos.y, camerapos.z);
-    Matrix matView = rlGetMatrixModelview();
-    Matrix matProjection = rlGetMatrixProjection();
-    Matrix matModel = rlGetMatrixTransform();
-    Matrix matModelView = MatrixMultiply(matModel, matView);
-    Matrix matModelViewProjection = MatrixMultiply(matModelView, matProjection);
-    rlSetUniformMatrix(mainShader.locs[SHADER_LOC_MATRIX_MVP], matModelViewProjection);
+    if (mat==nullptr) {
+        Matrix matView = rlGetMatrixModelview();
+        Matrix matProjection = rlGetMatrixProjection();
+        Matrix matModel = rlGetMatrixTransform();
+        Matrix matModelView = MatrixMultiply(matModel, matView);
+        Matrix matModelViewProjection = MatrixMultiply(matModelView, matProjection);
+        rlSetUniformMatrix(mainShader.locs[SHADER_LOC_MATRIX_MVP], matModelViewProjection);
+    } else {
+        rlSetUniformMatrix(mainShader.locs[SHADER_LOC_MATRIX_MVP], *mat);
+    }
     loc = GetShaderLocation(mainShader, "FogMin");
     glUniform1f(loc, fogMin);
     loc = GetShaderLocation(mainShader, "FogMax");
@@ -523,11 +578,11 @@ void MapData::Draw(Vector3 camerapos) {
     loc = GetShaderLocation(mainShader, "LightLevel");
     glUniform1f(loc, lightLevel);
     loc = GetShaderLocation(mainShader, "drawPosition");
-    for (size_t i=0; i<meshes.length(); i++) {
+    for (size_t i=0; i<intMeshes.length(); i++) {
         if (ShouldRenderMap(camerapos, i)) {
             glUniform3f(loc, positions[i].x, positions[i].y, positions[i].z);
-            glBindVertexArray(meshes[i]->vao);
-            glDrawElements(GL_TRIANGLES, meshes[i]->triangleCount*3, GL_UNSIGNED_SHORT, 0);
+            glBindVertexArray(intMeshes[i]->vao);
+            glDrawElements(GL_TRIANGLES, intMeshes[i]->triangleCount*3, GL_UNSIGNED_SHORT, 0);
             glBindVertexArray(0);
         }
     }
@@ -544,4 +599,51 @@ void MapData::SetFog(float fogMin, float fogMax, float* fogColor) {
     this->fogColor[2] = fogColor[2];
     this->fogColor[3] = fogColor[3];
 }
+#pragma endregion
+
+#pragma region Movement
+Vector3 MapData::MoveTo(Vector3 position, Vector3 move, bool noclip) {
+    bool collided = false;
+    unsigned short tid1 = get({position.x + move.x + (move.x>0?PLAYER_WIDTH:-PLAYER_WIDTH), position.y, position.z});
+    MapTile* tile1 = tileRegistry->of(tid1);
+    unsigned short tid2 = get({position.x, position.y, position.z + move.z + (move.z>0?PLAYER_WIDTH:-PLAYER_WIDTH)});
+    MapTile* tile2 = tileRegistry->of(tid2);
+    if (noclip) {
+        position = Vector3Add(position, move);
+    } else {
+        if ((tile1 == nullptr || !tile1->isSolid)) {
+            position.x += move.x;
+        } else {
+            if (move.x > 0) {
+                position.x = ceilf(position.x) - PLAYER_WIDTH;
+            } else {
+                position.x = floorf(position.x) + PLAYER_WIDTH;
+            }
+        }
+        if ((tile2 == nullptr || !tile2->isSolid)) {
+            position.z += move.z;
+        } else {
+            if (move.z > 0) {
+                position.z = ceilf(position.z) - PLAYER_WIDTH;
+            } else {
+                position.z = floorf(position.z) + PLAYER_WIDTH;
+            }
+        }
+    }
+    return position;
+}
+
+Vector3 MapData::ApplyGravity(Vector3 position, float amount) {
+    position.y -= PLAYER_HEIGHT;
+    unsigned short tid = get(position);
+    MapTile* tile = tileRegistry->of(tid);
+    if (tile == nullptr || !tile->floor) {
+        position.y -= amount;
+    } else {
+        position.y = floorf(position.y);
+    }
+    position.y += PLAYER_HEIGHT;
+    return position;
+}
+
 #pragma endregion

@@ -226,5 +226,59 @@
   "command": "C:\\raylib\\w64devkit\\bin\\c++.exe -DGRAPHICS_API_OPENGL_33 -DPLATFORM_DESKTOP @CMakeFiles/rlimgui.dir/includes_CXX.rsp -g -std=gnu++17 -o CMakeFiles\\rlimgui.dir\\rlImGui.cpp.obj -c C:\\Users\\becka\\Documents\\GitHub\\BR92Engine\\thirdparty\\rlImGui\\rlImGui.cpp",
   "file": "C:/Users/becka/Documents/GitHub/BR92Engine/thirdparty/rlImGui/rlImGui.cpp",
   "output": "thirdparty/rlImGui/CMakeFiles/rlimgui.dir/rlImGui.cpp.obj"
+},
+{
+  "directory": "C:/Users/becka/Documents/GitHub/BR92Engine/build/thirdparty/openvr/src",
+  "command": "C:\\raylib\\w64devkit\\bin\\c++.exe -DOPENVR_BUILD_STATIC -DVRCORE_NO_PLATFORM -DVR_API_PUBLIC -DWIN64 @CMakeFiles/openvr_api64.dir/includes_CXX.rsp  -std=c++11 -fPIC -fvisibility=hidden -g -std=gnu++17 -o CMakeFiles\\openvr_api64.dir\\openvr_api_public.cpp.obj -c C:\\Users\\becka\\Documents\\GitHub\\BR92Engine\\thirdparty\\openvr\\src\\openvr_api_public.cpp",
+  "file": "C:/Users/becka/Documents/GitHub/BR92Engine/thirdparty/openvr/src/openvr_api_public.cpp",
+  "output": "thirdparty/openvr/src/CMakeFiles/openvr_api64.dir/openvr_api_public.cpp.obj"
+},
+{
+  "directory": "C:/Users/becka/Documents/GitHub/BR92Engine/build/thirdparty/openvr/src",
+  "command": "C:\\raylib\\w64devkit\\bin\\c++.exe -DOPENVR_BUILD_STATIC -DVRCORE_NO_PLATFORM -DVR_API_PUBLIC -DWIN64 @CMakeFiles/openvr_api64.dir/includes_CXX.rsp  -std=c++11 -fPIC -fvisibility=hidden -g -std=gnu++17 -o CMakeFiles\\openvr_api64.dir\\jsoncpp.cpp.obj -c C:\\Users\\becka\\Documents\\GitHub\\BR92Engine\\thirdparty\\openvr\\src\\jsoncpp.cpp",
+  "file": "C:/Users/becka/Documents/GitHub/BR92Engine/thirdparty/openvr/src/jsoncpp.cpp",
+  "output": "thirdparty/openvr/src/CMakeFiles/openvr_api64.dir/jsoncpp.cpp.obj"
+},
+{
+  "directory": "C:/Users/becka/Documents/GitHub/BR92Engine/build/thirdparty/openvr/src",
+  "command": "C:\\raylib\\w64devkit\\bin\\c++.exe -DOPENVR_BUILD_STATIC -DVRCORE_NO_PLATFORM -DVR_API_PUBLIC -DWIN64 @CMakeFiles/openvr_api64.dir/includes_CXX.rsp  -std=c++11 -fPIC -fvisibility=hidden -g -std=gnu++17 -o CMakeFiles\\openvr_api64.dir\\vrcore\\dirtools_public.cpp.obj -c C:\\Users\\becka\\Documents\\GitHub\\BR92Engine\\thirdparty\\openvr\\src\\vrcore\\dirtools_public.cpp",
+  "file": "C:/Users/becka/Documents/GitHub/BR92Engine/thirdparty/openvr/src/vrcore/dirtools_public.cpp",
+  "output": "thirdparty/openvr/src/CMakeFiles/openvr_api64.dir/vrcore/dirtools_public.cpp.obj"
+},
+{
+  "directory": "C:/Users/becka/Documents/GitHub/BR92Engine/build/thirdparty/openvr/src",
+  "command": "C:\\raylib\\w64devkit\\bin\\c++.exe -DOPENVR_BUILD_STATIC -DVRCORE_NO_PLATFORM -DVR_API_PUBLIC -DWIN64 @CMakeFiles/openvr_api64.dir/includes_CXX.rsp  -std=c++11 -fPIC -fvisibility=hidden -g -std=gnu++17 -o CMakeFiles\\openvr_api64.dir\\vrcore\\envvartools_public.cpp.obj -c C:\\Users\\becka\\Documents\\GitHub\\BR92Engine\\thirdparty\\openvr\\src\\vrcore\\envvartools_public.cpp",
+  "file": "C:/Users/becka/Documents/GitHub/BR92Engine/thirdparty/openvr/src/vrcore/envvartools_public.cpp",
+  "output": "thirdparty/openvr/src/CMakeFiles/openvr_api64.dir/vrcore/envvartools_public.cpp.obj"
+},
+{
+  "directory": "C:/Users/becka/Documents/GitHub/BR92Engine/build/thirdparty/openvr/src",
+  "command": "C:\\raylib\\w64devkit\\bin\\c++.exe -DOPENVR_BUILD_STATIC -DVRCORE_NO_PLATFORM -DVR_API_PUBLIC -DWIN64 @CMakeFiles/openvr_api64.dir/includes_CXX.rsp  -std=c++11 -fPIC -fvisibility=hidden -g -std=gnu++17 -o CMakeFiles\\openvr_api64.dir\\vrcore\\pathtools_public.cpp.obj -c C:\\Users\\becka\\Documents\\GitHub\\BR92Engine\\thirdparty\\openvr\\src\\vrcore\\pathtools_public.cpp",
+  "file": "C:/Users/becka/Documents/GitHub/BR92Engine/thirdparty/openvr/src/vrcore/pathtools_public.cpp",
+  "output": "thirdparty/openvr/src/CMakeFiles/openvr_api64.dir/vrcore/pathtools_public.cpp.obj"
+},
+{
+  "directory": "C:/Users/becka/Documents/GitHub/BR92Engine/build/thirdparty/openvr/src",
+  "command": "C:\\raylib\\w64devkit\\bin\\c++.exe -DOPENVR_BUILD_STATIC -DVRCORE_NO_PLATFORM -DVR_API_PUBLIC -DWIN64 @CMakeFiles/openvr_api64.dir/includes_CXX.rsp  -std=c++11 -fPIC -fvisibility=hidden -g -std=gnu++17 -o CMakeFiles\\openvr_api64.dir\\vrcore\\sharedlibtools_public.cpp.obj -c C:\\Users\\becka\\Documents\\GitHub\\BR92Engine\\thirdparty\\openvr\\src\\vrcore\\sharedlibtools_public.cpp",
+  "file": "C:/Users/becka/Documents/GitHub/BR92Engine/thirdparty/openvr/src/vrcore/sharedlibtools_public.cpp",
+  "output": "thirdparty/openvr/src/CMakeFiles/openvr_api64.dir/vrcore/sharedlibtools_public.cpp.obj"
+},
+{
+  "directory": "C:/Users/becka/Documents/GitHub/BR92Engine/build/thirdparty/openvr/src",
+  "command": "C:\\raylib\\w64devkit\\bin\\c++.exe -DOPENVR_BUILD_STATIC -DVRCORE_NO_PLATFORM -DVR_API_PUBLIC -DWIN64 @CMakeFiles/openvr_api64.dir/includes_CXX.rsp  -std=c++11 -fPIC -fvisibility=hidden -g -std=gnu++17 -o CMakeFiles\\openvr_api64.dir\\vrcore\\hmderrors_public.cpp.obj -c C:\\Users\\becka\\Documents\\GitHub\\BR92Engine\\thirdparty\\openvr\\src\\vrcore\\hmderrors_public.cpp",
+  "file": "C:/Users/becka/Documents/GitHub/BR92Engine/thirdparty/openvr/src/vrcore/hmderrors_public.cpp",
+  "output": "thirdparty/openvr/src/CMakeFiles/openvr_api64.dir/vrcore/hmderrors_public.cpp.obj"
+},
+{
+  "directory": "C:/Users/becka/Documents/GitHub/BR92Engine/build/thirdparty/openvr/src",
+  "command": "C:\\raylib\\w64devkit\\bin\\c++.exe -DOPENVR_BUILD_STATIC -DVRCORE_NO_PLATFORM -DVR_API_PUBLIC -DWIN64 @CMakeFiles/openvr_api64.dir/includes_CXX.rsp  -std=c++11 -fPIC -fvisibility=hidden -g -std=gnu++17 -o CMakeFiles\\openvr_api64.dir\\vrcore\\vrpathregistry_public.cpp.obj -c C:\\Users\\becka\\Documents\\GitHub\\BR92Engine\\thirdparty\\openvr\\src\\vrcore\\vrpathregistry_public.cpp",
+  "file": "C:/Users/becka/Documents/GitHub/BR92Engine/thirdparty/openvr/src/vrcore/vrpathregistry_public.cpp",
+  "output": "thirdparty/openvr/src/CMakeFiles/openvr_api64.dir/vrcore/vrpathregistry_public.cpp.obj"
+},
+{
+  "directory": "C:/Users/becka/Documents/GitHub/BR92Engine/build/thirdparty/openvr/src",
+  "command": "C:\\raylib\\w64devkit\\bin\\c++.exe -DOPENVR_BUILD_STATIC -DVRCORE_NO_PLATFORM -DVR_API_PUBLIC -DWIN64 @CMakeFiles/openvr_api64.dir/includes_CXX.rsp  -std=c++11 -fPIC -fvisibility=hidden -g -std=gnu++17 -o CMakeFiles\\openvr_api64.dir\\vrcore\\strtools_public.cpp.obj -c C:\\Users\\becka\\Documents\\GitHub\\BR92Engine\\thirdparty\\openvr\\src\\vrcore\\strtools_public.cpp",
+  "file": "C:/Users/becka/Documents/GitHub/BR92Engine/thirdparty/openvr/src/vrcore/strtools_public.cpp",
+  "output": "thirdparty/openvr/src/CMakeFiles/openvr_api64.dir/vrcore/strtools_public.cpp.obj"
 }
 ]

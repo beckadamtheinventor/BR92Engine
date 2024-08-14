@@ -13,8 +13,6 @@ out vec2 fragTexCoord;
 out vec4 vertColor;
 out float lightLevel;
 
-#define SCALE 2.0f;
-
 void main()
 {
     // Unpack
@@ -24,9 +22,6 @@ void main()
     x += drawPosition.x;
     y += drawPosition.y;
     z += drawPosition.z;
-    x *= SCALE;
-    y *= SCALE;
-    z *= SCALE;
     float light = float(1u + ((vertexInfo1 >> 16u) & 0xFFu));
     uint vno = (vertexInfo1 >> 30u) & 3u;
     uint ri = (vertexInfo2 >> 12u) & 0xFu;
