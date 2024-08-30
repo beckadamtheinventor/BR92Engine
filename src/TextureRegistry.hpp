@@ -1,7 +1,9 @@
 #pragma once
 
 #include "AssetPath.hpp"
+#include "Json.hpp"
 #include "Registry.hpp"
+#include "Helpers.hpp"
 #include "raylib.h"
 
 struct RegisteredTexture {
@@ -57,8 +59,41 @@ class TextureRegistry : public Registry<RegisteredTexture> {
             }
         }
         Texture2D atlastex = LoadTextureFromImage(atlas);
+        GenTextureMipmaps(&atlastex);
         // ExportImage(atlas, "atlas.png");
         UnloadImage(atlas);
         return atlastex;
+    }
+
+    bool load(const char* fname) {
+        fname = AssetPath::clone(fname);
+        add("none");
+        char* datastr;
+        std::ifstream fd(fname);
+        if (fd.is_open()) {
+            size_t count = fstreamlen(fd);
+            datastr = new char[count+1];
+            fd.read(datastr, count);
+            datastr[count] = 0;
+            fd.close();
+            JSON::JSON json = JSON::deserialize(datastr);
+            delete [] datastr;
+            if (json.contains("elements") && json["elements"].getType() == JSON::Type::Array) {
+                JSON::JSONArray& arr = json["elements"].getArray();
+                for (size_t i=0; i<arr.length; i++) {
+                    if (arr[i].getType() == JSON::Type::String) {
+                        this->add(arr[i].getCString());
+                    }
+                }
+            } else {
+                JsonFormatError("textures.json", "Expected member \"elements\" in root containing an array of strings");
+                return false;
+            }
+        } else {
+            MissingAssetError(AssetPath::root("textures", "json"));
+            return false;
+        }
+        delete fname;
+        return true;
     }
 };

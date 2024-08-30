@@ -1,6 +1,6 @@
 /* Simple Read/Write Buffer classes
- * Author: Adam "beckadamtheinventor" Beckingham
- * License: MIT
+* Author: Adam "beckadamtheinventor" Beckingham
+* License: MIT
  */
 #pragma once
 
@@ -8,44 +8,43 @@
 #include <ios>
 #include <istream>
 #include <ostream>
-template<class T>
 class RWBuffer {
     protected:
-    T* _data;
+    unsigned char* _data;
     size_t _len;
     size_t _offset;
     public:
-    RWBuffer<T>() : RWBuffer<T>(0) {}
+    RWBuffer() : RWBuffer(0) {}
     void open(std::istream& fd) {
         fd.seekg(0, std::ios::end);
         size_t count = fd.tellg();
         fd.seekg(0, std::ios::beg);
         resize(count);
-        fd.read(_data, count);
+        fd.read((char*)_data, count);
     }
     void open(const char* f) {
         std::ifstream fd(f);
-        RWBuffer<T> buf;
+        RWBuffer buf;
         if (fd.is_open()) {
             open(fd);
         }
     }
-    inline RWBuffer<T>(size_t len, size_t offset=0) {
+    inline RWBuffer(size_t len, size_t offset=0) {
 		if (len == 0) {
 			_data = nullptr;
 		} else {
-			_data = new T[len];
+			_data = new unsigned char [len];
 		}
         _len = len;
         _offset = offset;
     }
-    inline RWBuffer<T>(T* ptr, size_t len, size_t offset=0) {
+    inline RWBuffer(unsigned char* ptr, size_t len, size_t offset=0) {
         _data = ptr;
         _len = len;
         _offset = offset;
     }
     void flush(std::ostream& fd) {
-        fd.write(_data, _len);
+        fd.write((char*)_data, _len);
     }
     void flush(const char* f) {
         std::ofstream fd(f);
@@ -59,11 +58,11 @@ class RWBuffer {
         return _data==nullptr ? 0 : _len;
     }
     inline size_t available() {
-        return _len - _offset;
+        return _data==nullptr ? 0 : _len - _offset;
     }
     void resize(size_t size) {
         if (_len != size) {
-            T* newdata = new T[size];
+            unsigned char* newdata = new unsigned char [size];
             if (_data != nullptr) {
                 for (size_t i=0; i<size; i++) {
                     if (i >= _len) {
@@ -104,20 +103,20 @@ class RWBuffer {
 			}
 		}
 	}
-    inline T read() {
+    inline unsigned char read() {
         if (_data != nullptr && _offset < _len) {
             return _data[_offset++];
         }
-        return T();
+        return 0;
     }
-    inline bool read(T& v) {
+    inline bool read(unsigned char & v) {
         if (_offset < _len) {
             v = _data[_offset++];
             return true;
         }
         return false;
     }
-    size_t read(T* v, size_t amount) {
+    size_t read(unsigned char* v, size_t amount) {
         if (_data == nullptr) {
 			return 0;
 		}
@@ -129,7 +128,16 @@ class RWBuffer {
         }
         return amount;
     }
-    inline bool write(T v) {
+    template<class V>
+    inline bool readV(V* val) {
+        if (available() < sizeof(V)) {
+            return false;
+        }
+        read((unsigned char *)val, sizeof(V));
+        return true;
+    }
+
+    inline bool write(unsigned char  v) {
         if (_data == nullptr) {
 			return false;
 		}
@@ -139,7 +147,7 @@ class RWBuffer {
         }
         return false;
     }
-    size_t write(T* v, size_t amount) {
+    inline size_t write(unsigned char* v, size_t amount) {
         if (_data == nullptr) {
 			return 0;
 		}
@@ -151,12 +159,16 @@ class RWBuffer {
         }
         return amount;
     }
+    template<class V>
+    bool writeV(V* val) {
+        write(val, sizeof(V));
+        return true;
+    }
 };
 
-template<class T>
-class RBuffer : public RWBuffer<T> {
-    inline bool write(T v) {}
-    inline size_t write(T* v, size_t amount) {}
+class RBuffer : public RWBuffer {
+    inline bool write(unsigned char  v) {}
+    inline size_t write(unsigned char* v, size_t amount) {}
     void flush(std::ostream& fd) {}
     void flush(const char* f) {}
     inline bool writeable() {
@@ -164,11 +176,10 @@ class RBuffer : public RWBuffer<T> {
     }
 };
 
-template<class T>
-class WBuffer : public RWBuffer<T> {
-    inline T read() {}
-    inline bool read(T& v) {}
-    inline size_t read(T* v, size_t amount) {}
+class WBuffer : public RWBuffer {
+    inline unsigned char  read() {}
+    inline bool read(unsigned char & v) {}
+    inline size_t read(unsigned char* v, size_t amount) {}
     inline bool readable() {
         return false;
     }

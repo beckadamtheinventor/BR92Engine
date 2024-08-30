@@ -30,6 +30,16 @@ class AssetPath {
         // printf("AssetPath: %s\n", p);
         return p;
     }
+    /* Return a clone of str, allocated with new. */
+    static inline char* clone(const char* str) {
+        if (str == nullptr) {
+            return nullptr;
+        }
+        size_t count = strlen(str)+1;
+        char* rv = new char[count];
+        memcpy(rv, str, count);
+        return rv;
+    }
     /* Return a path to "assets/textures/<name>.<type>".
        Note that the memory where the path is stored is overwritten next time an AssetPath function is called */
     static inline char* texture(const char* name, const char* type="png") {
@@ -52,7 +62,7 @@ class AssetPath {
     }
     /* Return a path to "assets/shaders/<name>.<type>".
        Note that the memory where the path is stored is overwritten next time an AssetPath function is called */
-    static inline char* shader(const char* name, const char* type="glsl") {
+    static inline char* shader(const char* name, const char* type="shader") {
         return concat(assetPathBuffer, assetPathShaders, name, type);
     }
     /* Return a path to "assets/<name>.<type>".

@@ -2,7 +2,7 @@
 
 #include "DynamicArray.hpp"
 #include "Array2D.hpp"
-#include "Registry.hpp"
+#include "TileRegistry.hpp"
 #include "TextureRegistry.hpp"
 #include "Buffer.hpp"
 #include "Vec3.hpp"
@@ -12,18 +12,26 @@
 #include "external/glad.h"
 
 #pragma region Defines
-#define WALL_MAP_MAGIC_NUMBER   (*(uint32_t*)"WALL")
-#define TILE_MAP_MAGIC_NUMBER   (*(uint32_t*)"TILE")
+#define TILE_MAP_MAGIC_NUMBER_STR "TILE"
+#define LIGHT_MAP_MAGIC_NUMBER_STR "LMAP"
+#define WALL_MAP_MAGIC_NUMBER_STR "WALL"
+#define FOG_MAGIC_NUMBER_STR "FOGC"
+#define TILE_MAP_MAGIC_NUMBER   (*(uint32_t*)TILE_MAP_MAGIC_NUMBER_STR)
+#define LIGHT_MAP_MAGIC_NUMBER  (*(uint32_t*)LIGHT_MAP_MAGIC_NUMBER_STR)
+#define WALL_MAP_MAGIC_NUMBER   (*(uint32_t*)WALL_MAP_MAGIC_NUMBER_STR)
+#define FOG_MAGIC_NUMBER        (*(uint32_t*)FOG_MAGIC_NUMBER_STR)
 
 #define LIGHT_RANGE 6
 #define PLAYER_HEIGHT 0.4f
+#define PLAYER_JUMP 0.25f
 #define LEVEL_HEIGHT 1.0f
 #define PLAYER_WIDTH 0.125f
+#define GRAVITY -9.81
 
 #pragma endregion
 
-#pragma region IntMesh
-class IntMesh {
+#pragma region MapIntMesh
+class MapIntMesh {
     public:
     unsigned int vertexCount = 0;
     unsigned int triangleCount = 0;
@@ -42,28 +50,6 @@ class PlacedLight {
 };
 #pragma endregion
 
-#pragma region MapTile
-class MapTile {
-    public:
-    unsigned short id;
-    union {
-        unsigned short flags;
-        struct {
-            bool isSolid : 1;
-            bool isWall : 1;
-            bool isSpawnable : 1;
-            bool blocksLight : 1;
-        };
-    };
-    unsigned char light, tintr, tintg, tintb;
-    unsigned short floor, ceiling, wall;
-};
-#pragma endregion
-
-#pragma region MapTileRegistry
-class MapTileRegistry : public Registry<MapTile> {};
-#pragma endregion
-
 #pragma region TileArray
 class TileArray : public Array2D<unsigned short> {
     public:
@@ -77,43 +63,38 @@ class TileArray : public Array2D<unsigned short> {
 #pragma endregion
 
 #pragma region LightMap
-struct LightMapEntry {
-    unsigned char r, g, b, n;
-    float v;
-};
-class LightMap : public Array2D<LightMapEntry> {
+// struct LightMapEntry {
+//     unsigned char r, g, b, n;
+//     float v;
+// };
+class LightMap {
+    Texture2D _tex = {0};
+    Image _img = {0};
     public:
     LightMap() {}
     LightMap(int width, int height) {
-        w = width;
-        h = height;
-        l = w * h;
-        values = new LightMapEntry[l];
-        for (size_t i=0; i<l; i++) {
-            values[i] = {255, 255, 255, 0, 0};
-        }
+        _img = GenImageColor(width, height, WHITE);
     }
-    LightMapEntry tryGet(int ix, int iy) {
-        if (ix >= 0 && iy >= 0 && ix < w && iy < h) {
-            return values[iy * w + ix];
-        }
-        return {0};
+    void upload() {
+        _tex = LoadTextureFromImage(_img);
     }
-
-    LightMapEntry getInterpolated(int x, int z) {
-        LightMapEntry v00 = tryGet((int)floorf(x + 0.5f), (int)floorf(z + 0.5f));
-        LightMapEntry v01 = tryGet((int)floorf(x + 0.5f), (int)floorf(z - 0.5f));
-        LightMapEntry v10 = tryGet((int)floorf(x - 0.5f), (int)floorf(z + 0.5f));
-        LightMapEntry v11 = tryGet((int)floorf(x - 0.5f), (int)floorf(z - 0.5f));
-        unsigned int r = v00.r + v01.r + v10.r + v11.r;
-        unsigned int g = v00.g + v01.g + v10.g + v11.g;
-        unsigned int b = v00.b + v01.b + v10.b + v11.b;
-        // unsigned char n = (v00.n + v01.n + v10.n + v11.n) / 4;
-        float v = v00.v + v01.v + v10.v + v11.v;
-        unsigned char rc = r / 4;
-        unsigned char gc = g / 4;
-        unsigned char bc = b / 4;
-        return {rc, gc, bc, 1, v};
+    size_t width() {
+        return _tex.width;
+    }
+    size_t height() {
+        return _tex.height;
+    }
+    Color* get(int x, int y) {
+        Color* colors = (Color*)_img.data;
+        if (y >= 0 && y < height()) {
+            if (x >= 0 && x < width()) {
+                return &colors[x + y*width()];
+            }
+        }
+        return nullptr;
+    }
+    unsigned int getId() {
+        return _tex.id;
     }
 };
 #pragma endregion
@@ -136,40 +117,55 @@ struct HitInfo {
 class MapData {
     DynamicArray<Vec3I> positions;
     DynamicArray<TileArray> maps;
-    DynamicArray<IntMesh*> intMeshes;
+    DynamicArray<MapIntMesh*> MapIntMeshes;
     DynamicArray<LightMap*> lightmaps;
     DynamicArray<PlacedLight> lightList;
-    Texture2D atlas = {0};
     MapTileRegistry* tileRegistry = nullptr;
     TextureRegistry* textureRegistry = nullptr;
-    Shader mainShader;
     unsigned int depthTextureId;
+    bool hasLoadedLightmaps = false;
     public:
+    Shader mainShader;
+    Shader spriteShader;
+    Texture2D atlas = {0};
     float fogMin, fogMax, fogColor[4], lightLevel, renderDistance;
     void BuildAtlas();
     void InitMesher(unsigned int depthTextureId);
-    bool LoadMap(RBuffer<char>& data);
-    bool LoadMapChunk(RBuffer<char>& data);
-    bool LoadMapWalls(RBuffer<char>& data);
-    bool LoadMapTiles(RBuffer<char>& data);
+    bool LoadMap(RBuffer& data);
+    bool LoadMapChunk(RBuffer& data);
+    bool LoadMapWalls(RBuffer& data);
+    bool LoadMapTiles(RBuffer& data);
+    bool LoadLightMap(RBuffer& data);
+    bool HasLoadedLightmaps();
+    void SaveMap(const char* fname);
+    void SaveMap(std::ostream& fd);
+    void SaveMapTile(std::ostream& fd, TileArray* arr, Vec3I position);
+    void SaveLightMap(std::ostream& fd, size_t i, LightMap* map=nullptr);
     Vector3 RayCast(Vector3 pos, Vector3 dir, HitInfo& hit, size_t max_steps=100);
+    void SetLevelMesh(size_t i, unsigned int vertCount, unsigned int* verts, unsigned int triangleCount, unsigned short* indices);
+    void GenerateMesh(size_t i);
     void GenerateMesh();
     void BuildLighting();
     void UploadMap(size_t mapno);
     void UploadMap();
+    void ClearMap();
     void SetTileRegistry(MapTileRegistry* reg);
     void SetTextureRegistry(TextureRegistry* reg);
     unsigned short get(Vector3 pos);
     unsigned short get(int x, int y, int z);
+    void setLight(Vector3 p1, Vector3 p2, float v, unsigned char r, unsigned char g, unsigned char b);
     void setLight(Vector3 pos, float v, unsigned char r, unsigned char g, unsigned char b);
     void setLight(int x, int y, int z, float v, unsigned char r, unsigned char g, unsigned char b);
-    LightMapEntry* getLight(Vector3 pos);
-    LightMapEntry* getLight(int x, int y, int z);
+    Color* getLight(Vector3 pos);
+    size_t findLight(Vector3 pos);
+    size_t findLight(int x, int y, int z);
+    LightMap* getLightMap(Vector3 pos);
+    Color* getLight(int x, int y, int z);
     void addLight(int x, int y, int z, float v, unsigned char r, unsigned char g, unsigned char b);
     bool ShouldRenderMap(Vector3 pos, size_t mapno);
-    void Draw(Vector3 camerapos, Matrix* mat=nullptr);
+    void Draw(Vector3 camerapos, Matrix* mat=nullptr, float renderwidth=1920);
     void SetFog(float fogMin, float fogMax, float* fogColor);
     Vector3 MoveTo(Vector3 position, Vector3 move, bool noclip=false);
-    Vector3 ApplyGravity(Vector3 position, float amount);
+    Vector3 ApplyGravity(Vector3 position, float& momentum, float dt);
 };
 #pragma endregion

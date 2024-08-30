@@ -51,5 +51,10 @@
 		"door1sidewall",
 		"ceiling1lampoff",
 		"ceiling2lampoff",
+		"wall1mid",
+		"wall1upper",
+		"wall3mid",
+		"wall3alt1mid",
+		"entityMonster"
 	]
 }

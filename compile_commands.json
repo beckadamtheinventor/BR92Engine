@@ -7,6 +7,12 @@
 },
 {
   "directory": "C:/Users/becka/Documents/GitHub/BR92Engine/build",
+  "command": "C:\\raylib\\w64devkit\\bin\\c++.exe -DGRAPHICS_API_OPENGL_33 -DPLATFORM_DESKTOP -DPRODUCTION_BUILD=0 -DRESOURCES_PATH=\\\"C:/Users/becka/Documents/GitHub/BR92Engine/resources/\\\" @CMakeFiles/BR92Engine.dir/includes_CXX.rsp -g -std=gnu++17 -flto=auto -fno-fat-lto-objects -o CMakeFiles\\BR92Engine.dir\\src\\VRUtil.cpp.obj -c C:\\Users\\becka\\Documents\\GitHub\\BR92Engine\\src\\VRUtil.cpp",
+  "file": "C:/Users/becka/Documents/GitHub/BR92Engine/src/VRUtil.cpp",
+  "output": "CMakeFiles/BR92Engine.dir/src/VRUtil.cpp.obj"
+},
+{
+  "directory": "C:/Users/becka/Documents/GitHub/BR92Engine/build",
   "command": "C:\\raylib\\w64devkit\\bin\\c++.exe -DGRAPHICS_API_OPENGL_33 -DPLATFORM_DESKTOP -DPRODUCTION_BUILD=0 -DRESOURCES_PATH=\\\"C:/Users/becka/Documents/GitHub/BR92Engine/resources/\\\" @CMakeFiles/BR92Engine.dir/includes_CXX.rsp -g -std=gnu++17 -flto=auto -fno-fat-lto-objects -o CMakeFiles\\BR92Engine.dir\\src\\main.cpp.obj -c C:\\Users\\becka\\Documents\\GitHub\\BR92Engine\\src\\main.cpp",
   "file": "C:/Users/becka/Documents/GitHub/BR92Engine/src/main.cpp",
   "output": "CMakeFiles/BR92Engine.dir/src/main.cpp.obj"

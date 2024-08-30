@@ -1,172 +1,196 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<tileset version="1.9" tiledversion="1.9.2" name="BackroomsTileset" tilewidth="64" tileheight="64" tilecount="56" columns="0">
+<tileset version="1.10" tiledversion="1.11.0" name="BackroomsTileset" tilewidth="64" tileheight="64" tilecount="57" columns="0">
  <grid orientation="orthogonal" width="1" height="1"/>
  <tile id="2">
-  <image width="64" height="64" source="../textures/none.png"/>
+  <image source="../textures/none.png" width="1" height="1"/>
  </tile>
  <tile id="3">
-  <image width="64" height="64" source="../textures/wall1.png"/>
+  <image source="../textures/wall1.png" width="64" height="64"/>
  </tile>
  <tile id="4">
-  <image width="64" height="64" source="../textures/wall2.png"/>
+  <image source="../textures/wall2.png" width="64" height="64"/>
  </tile>
  <tile id="5">
-  <image width="64" height="64" source="../textures/floor1.png"/>
+  <image source="../textures/floor1.png" width="64" height="64"/>
  </tile>
  <tile id="6">
-  <image width="64" height="64" source="../textures/floor2.png"/>
+  <image source="../textures/floor2.png" width="64" height="64"/>
  </tile>
  <tile id="7">
-  <image width="64" height="64" source="../textures/ceiling1.png"/>
+  <image source="../textures/ceiling1.png" width="64" height="64"/>
  </tile>
  <tile id="8">
-  <image width="64" height="64" source="../textures/floor2.png"/>
+  <image source="../textures/floor2.png" width="64" height="64"/>
  </tile>
  <tile id="9">
-  <image width="64" height="64" source="../textures/ceiling1lamp.png"/>
+  <image source="../textures/ceiling1lamp.png" width="64" height="64"/>
  </tile>
  <tile id="10">
-  <image width="64" height="64" source="../textures/ceiling2lamp.png"/>
+  <image source="../textures/ceiling2lamp.png" width="64" height="64"/>
  </tile>
  <tile id="11">
-  <image width="64" height="64" source="../textures/wall1alt1.png"/>
+  <image source="../textures/wall1alt1.png" width="64" height="64"/>
  </tile>
  <tile id="12">
-  <image width="64" height="64" source="../textures/wall2alt1.png"/>
+  <image source="../textures/wall2alt1.png" width="64" height="64"/>
  </tile>
  <tile id="13">
-  <image width="64" height="64" source="../textures/wall1alt2.png"/>
+  <image source="../textures/wall1alt2.png" width="64" height="64"/>
  </tile>
  <tile id="14">
-  <image width="64" height="64" source="../textures/wall2alt2.png"/>
+  <image source="../textures/wall2alt2.png" width="64" height="64"/>
  </tile>
  <tile id="15">
-  <image width="64" height="64" source="../textures/floor1alt1.png"/>
+  <image source="../textures/floor1alt1.png" width="64" height="64"/>
  </tile>
  <tile id="16">
-  <image width="64" height="64" source="../textures/floor2alt1.png"/>
+  <image source="../textures/floor2alt1.png" width="64" height="64"/>
  </tile>
  <tile id="17">
-  <image width="64" height="64" source="../textures/wall1scribbles1.png"/>
+  <image source="../textures/wall1scribbles1.png" width="64" height="64"/>
  </tile>
  <tile id="18">
-  <image width="64" height="64" source="../textures/wall1scribbles2.png"/>
+  <image source="../textures/wall1scribbles2.png" width="64" height="64"/>
  </tile>
  <tile id="19">
-  <image width="64" height="64" source="../textures/wall1scribbles3a.png"/>
+  <image source="../textures/wall1scribbles3a.png" width="64" height="64"/>
  </tile>
  <tile id="20">
-  <image width="64" height="64" source="../textures/wall1scribbles3b.png"/>
+  <image source="../textures/wall1scribbles3b.png" width="64" height="64"/>
  </tile>
  <tile id="21">
-  <image width="64" height="64" source="../textures/wall1stain1.png"/>
+  <image source="../textures/wall1stain1.png" width="64" height="64"/>
  </tile>
  <tile id="22">
-  <image width="64" height="64" source="../textures/wall1stain2.png"/>
+  <image source="../textures/wall1stain2.png" width="64" height="64"/>
  </tile>
  <tile id="23">
-  <image width="64" height="64" source="../textures/ceilingvoidlamp.png"/>
+  <image source="../textures/ceilingvoidlamp.png" width="64" height="64"/>
  </tile>
  <tile id="24">
-  <image width="64" height="64" source="../textures/wall1scribbles4a.png"/>
+  <image source="../textures/wall1scribbles4a.png" width="64" height="64"/>
  </tile>
  <tile id="25">
-  <image width="64" height="64" source="../textures/wall1scribbles4b.png"/>
+  <image source="../textures/wall1scribbles4b.png" width="64" height="64"/>
  </tile>
  <tile id="26">
-  <image width="64" height="64" source="../textures/floor1arrow1.png"/>
+  <image source="../textures/floor1arrow1.png" width="64" height="64"/>
  </tile>
  <tile id="27">
-  <image width="64" height="64" source="../textures/floor1arrow2.png"/>
+  <image source="../textures/floor1arrow2.png" width="64" height="64"/>
  </tile>
  <tile id="28">
-  <image width="64" height="64" source="../textures/floor1arrow3.png"/>
+  <image source="../textures/floor1arrow3.png" width="64" height="64"/>
  </tile>
  <tile id="29">
-  <image width="64" height="64" source="../textures/floor1arrow4.png"/>
+  <image source="../textures/floor1arrow4.png" width="64" height="64"/>
  </tile>
  <tile id="30">
-  <image width="64" height="64" source="../textures/wall1arrow1.png"/>
+  <image source="../textures/wall1arrow1.png" width="64" height="64"/>
  </tile>
  <tile id="31">
-  <image width="64" height="64" source="../textures/wall1arrow2.png"/>
+  <image source="../textures/wall1arrow2.png" width="64" height="64"/>
  </tile>
  <tile id="32">
-  <image width="64" height="64" source="../textures/floor1arrow5.png"/>
+  <image source="../textures/floor1arrow5.png" width="64" height="64"/>
  </tile>
  <tile id="33">
-  <image width="64" height="64" source="../textures/floor1arrow6.png"/>
+  <image source="../textures/floor1arrow6.png" width="64" height="64"/>
  </tile>
  <tile id="34">
-  <image width="64" height="64" source="../textures/floor2arrow1.png"/>
+  <image source="../textures/floor2arrow1.png" width="64" height="64"/>
  </tile>
  <tile id="35">
-  <image width="64" height="64" source="../textures/floor2arrow2.png"/>
+  <image source="../textures/floor2arrow2.png" width="64" height="64"/>
  </tile>
  <tile id="36">
-  <image width="64" height="64" source="../textures/floor2arrow3.png"/>
+  <image source="../textures/floor2arrow3.png" width="64" height="64"/>
  </tile>
  <tile id="37">
-  <image width="64" height="64" source="../textures/floor2arrow4.png"/>
+  <image source="../textures/floor2arrow4.png" width="64" height="64"/>
  </tile>
  <tile id="38">
-  <image width="64" height="64" source="../textures/floor2arrow5.png"/>
+  <image source="../textures/floor2arrow5.png" width="64" height="64"/>
  </tile>
  <tile id="39">
-  <image width="64" height="64" source="../textures/floor2arrow6.png"/>
+  <image source="../textures/floor2arrow6.png" width="64" height="64"/>
  </tile>
  <tile id="40">
-  <image width="64" height="64" source="../textures/floor3.png"/>
+  <image source="../textures/floor3.png" width="64" height="64"/>
  </tile>
  <tile id="41">
-  <image width="64" height="64" source="../textures/ceiling3.png"/>
+  <image source="../textures/ceiling3.png" width="64" height="64"/>
  </tile>
  <tile id="42">
-  <image width="64" height="64" source="../textures/ceiling3lamp.png"/>
+  <image source="../textures/ceiling3lamp.png" width="64" height="64"/>
  </tile>
  <tile id="43">
-  <image width="64" height="64" source="../textures/wall3.png"/>
+  <image source="../textures/wall3.png" width="64" height="64"/>
  </tile>
  <tile id="44">
-  <image width="64" height="64" source="../textures/wall3alt1.png"/>
+  <image source="../textures/wall3alt1.png" width="64" height="64"/>
  </tile>
  <tile id="45">
-  <image width="64" height="64" source="../textures/wall3alt2.png"/>
+  <image source="../textures/wall3alt2.png" width="64" height="64"/>
  </tile>
  <tile id="46">
-  <image width="64" height="64" source="../textures/wall4.png"/>
+  <image source="../textures/wall4.png" width="64" height="64"/>
  </tile>
  <tile id="47">
-  <image width="64" height="64" source="../textures/wall4lever.png"/>
+  <image source="../textures/wall4lever.png" width="64" height="64"/>
  </tile>
  <tile id="48">
-  <image width="64" height="64" source="../textures/floor4.png"/>
+  <image source="../textures/floor4.png" width="64" height="64"/>
  </tile>
  <tile id="49">
-  <image width="64" height="64" source="../textures/ceiling4.png"/>
+  <image source="../textures/ceiling4.png" width="64" height="64"/>
  </tile>
  <tile id="50">
-  <image width="64" height="64" source="../textures/ceiling4lamp.png"/>
+  <image source="../textures/ceiling4lamp.png" width="64" height="64"/>
  </tile>
  <tile id="51">
-  <image width="64" height="64" source="../textures/door1.png"/>
+  <image source="../textures/door1.png" width="64" height="64"/>
  </tile>
  <tile id="52">
-  <image width="64" height="64" source="../textures/door1sidewall.png"/>
+  <image source="../textures/door1sidewall.png" width="64" height="64"/>
  </tile>
  <tile id="53">
-  <image width="64" height="64" source="../textures/door1sidewall.png"/>
+  <image source="../textures/door1sidewall.png" width="64" height="64"/>
  </tile>
  <tile id="54">
-  <image width="64" height="64" source="../textures/ceiling1lampoff.png"/>
+  <image source="../textures/ceiling1lampoff.png" width="64" height="64"/>
  </tile>
  <tile id="55">
-  <image width="64" height="64" source="../textures/ceiling2lampoff.png"/>
+  <image source="../textures/ceiling2lampoff.png" width="64" height="64"/>
  </tile>
  <tile id="56">
-  <image width="64" height="64" source="../textures/ceiling1lamp.png"/>
+  <image source="../textures/ceiling1lamp.png" width="64" height="64"/>
  </tile>
  <tile id="57">
-  <image width="64" height="64" source="../textures/ceiling2lamp.png"/>
+  <image source="../textures/ceiling2lamp.png" width="64" height="64"/>
+ </tile>
+ <tile id="58">
+  <image source="../textures/ceiling1.png" width="64" height="64"/>
+ </tile>
+ <tile id="59">
+  <image source="../textures/floor2.png" width="64" height="64"/>
+ </tile>
+ <tile id="60">
+  <image source="../textures/floor1.png" width="64" height="64"/>
+ </tile>
+ <tile id="61">
+  <image source="../textures/floor2.png" width="64" height="64"/>
+ </tile>
+ <tile id="62">
+  <image source="../textures/wall1mid.png" width="64" height="64"/>
+ </tile>
+ <tile id="63">
+  <image source="../textures/wall1upper.png" width="64" height="64"/>
+ </tile>
+ <tile id="64">
+  <image source="../textures/wall3mid.png" width="64" height="64"/>
+ </tile>
+ <tile id="65">
+  <image source="../textures/wall3alt1mid.png" width="64" height="64"/>
  </tile>
 </tileset>
