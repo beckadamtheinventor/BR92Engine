@@ -1,10 +1,14 @@
 #pragma once
 
+#include "EntityRegistry.hpp"
 #include "MapData.hpp"
+#include "Registries.hpp"
+#include "ScriptEngine/ScriptBytecode.hpp"
 #include "external/glad.h"
 #include "raylib.h"
 #include "rlgl.h"
 #include "raymath.h"
+#include <ios>
 
 #define OpenGLDebug(s) if (GLenum e = glGetError()) printf("%s: OpenGL Error: %u\n", s, e)
 
@@ -13,12 +17,16 @@ class Entity {
     Vector3 pos;
     float rot, scale;
     unsigned short tno;
+    unsigned short type;
+    float timer;
 
-    Entity(unsigned short t, Vector3 p={0,0,0}, float r=0.0, float s=1.0) {
+    Entity(unsigned short t, unsigned short ty=0, Vector3 p={0,0,0}, float r=0.0, float s=1.0) {
         tno = t;
         pos = p;
         rot = r;
         scale = s;
+        type = ty;
+        timer = 0;
     }
 
     void Rotate(float r, bool set=false) {
@@ -69,10 +77,55 @@ class EntityRenderer : public DynamicArray<Entity*> {
         glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(float)*3, nullptr);
         glEnableVertexAttribArray(0);
     }
-    Entity* add(unsigned short tno, Vector3 pos, float rot=0) {
-        Entity* ent = new Entity(tno, pos, rot);
+    Entity* add(unsigned short tno, unsigned short type, Vector3 pos, float rot=0) {
+        Entity* ent = new Entity(tno, type, pos, rot);
         append(ent);
         return ent;
+    }
+    Entity* add(unsigned short tno, Vector3 pos, float rot=0) {
+        Entity* ent = new Entity(tno, 0, pos, rot);
+        append(ent);
+        return ent;
+    }
+
+    void Update(MapData* map, Vector3 camera, float dt) {
+        for (size_t i=0; i<length(); i++) {
+            Entity* ent = get(i);
+            if (ent == nullptr || ent->type == 0) {
+                continue;
+            }
+            EntityType* ent_type = GlobalEntityRegistry->of(ent->type);
+            if (ent_type == nullptr) {
+                continue;
+            }
+            if (ent_type->facesplayer) {
+                Vector3 dir = Vector3Subtract(ent->pos, camera);
+                float rot = atan2f(dir.z, dir.x);
+                ent->Rotate(rot, true);
+            }
+            if (ent_type->script == 0) {
+                continue;
+            }
+            Script* script = GlobalScriptRegistry->of(ent_type->script);
+            if (script == nullptr) {
+                continue;
+            }
+            long long rval = 0;
+            long long argv[2] = {(signed)i, ent->tno};
+            int res = script->code.run(2, argv, &rval);
+            if (res != ScriptBytecode::Result::Success) {
+                char name[64];
+                char* data;
+                size_t len = script->code.dump(&data);
+                snprintf(name, sizeof(name), "script%u_dump.bin", script->id);
+                std::ofstream fd(name, std::ios_base::out | std::ios_base::binary);
+                if (fd.is_open()) {
+                    fd.write(data, len);
+                    fd.close();
+                }
+                ent_type->script = 0;
+            }
+        }
     }
 
     void Draw(MapData* map, Vector3 camera, float renderwidth) {
@@ -128,3 +181,5 @@ class EntityRenderer : public DynamicArray<Entity*> {
         glBindTexture(GL_TEXTURE_2D, 0);
     }
 };
+
+extern EntityRenderer* GlobalEntityRenderer;

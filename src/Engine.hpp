@@ -1,26 +1,27 @@
 #pragma once
 
 #include "Configs.hpp"
-#include "DynamicArray.hpp"
 #include "Entity.hpp"
 #include "MapData.hpp"
-#include "TextureRegistry.hpp"
-#include "TileRegistry.hpp"
+#include "Registries.hpp"
 #include "imgui.h"
+#include "raylib.h"
+#include "ScriptEngine/ScriptBytecode.hpp"
+#include "ScriptEngine/ScriptAssemblyCompiler.hpp"
 
-#define PLAYER_SPEED 1.2f
+#define PLAYER_SPEED 1.5f
+
+extern EntityRenderer* GlobalEntityRenderer;
+
 class BR92Engine {
     public:
     MainConfig* cfg=nullptr;
     ShaderConfig* scfg=nullptr;
     DevConfig* dcfg=nullptr;
     char* levelFileName=nullptr;
-	MapData* map=nullptr;
-    Shader spriteShader;
-    TextureRegistry* GlobalTextureRegistry=nullptr;
-    MapTileRegistry* GlobalMapTileRegistry=nullptr;
-    EntityRenderer entities;
+    Shader postShader;
     RenderTexture2D gameTexture;
+    RenderTexture2D screenTexture;
     Camera3D camera;
     ImVec2 gameWindowPosition;
     Vector3 dev_lightPosition;
@@ -28,6 +29,7 @@ class BR92Engine {
     float dev_lightColor[3];
     float mouseSensitivity, playerSpeed, playerMomentumVertical;
     int renderScale, targetFps;
+    unsigned int postVao;
     union {
         int _flags;
         struct {
@@ -40,9 +42,9 @@ class BR92Engine {
             bool dev_liveFollowLight : 1;
         };
     };
-    bool freecam, godmode, noclip, save_on_exit;
+    bool freecam, godmode, noclip, save_on_exit, post_process_enabled;
     void Init();
-    bool LoadRegistries(char* textures=nullptr, char* tiles=nullptr);
+    bool LoadRegistries(char* textures=nullptr, char* tiles=nullptr, char* entities=nullptr, char* scripts=nullptr);
     void LoadConfigs();
     void LoadData();
     char* LoadIndex();
@@ -59,4 +61,6 @@ class BR92Engine {
     void Update(float dt);
     void EndWindow();
     void SaveConfigs();
+    void TakeScreenshot(Texture2D texture);
+    void ResizeWindow();
 };

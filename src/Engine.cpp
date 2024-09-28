@@ -1,5 +1,4 @@
 
-#include "MapData.hpp"
 #include "imgui.h"
 #include "imguiThemes.h"
 #include "raylib.h"
@@ -10,23 +9,30 @@
 #include "Engine.hpp"
 #include "AssetPath.hpp"
 #include "Helpers.hpp"
-#include "TextureRegistry.hpp"
-#include "TileRegistry.hpp"
+#include "Registries.hpp"
+#include "MapData.hpp"
+#include "ScriptEngine/ScriptInterface.hpp"
+#include "ShaderLoader.hpp"
 
 const char* MAIN_CONFIG_FILE = "config.dat";
 const char* SHADER_CONFIG_FILE = "assets/shaders/cfg.dat";
 const char* DEV_CONFIG_FILE = "dev.dat";
 const char* VERSION_STRING = "0.0.2-indev";
+EntityRenderer* GlobalEntityRenderer=nullptr;
 
 #pragma region Init
 void BR92Engine::Init() {
     GlobalMapTileRegistry = new MapTileRegistry();
     GlobalTextureRegistry = new TextureRegistry();
+	GlobalEntityRegistry = new EntityRegistry();
+	GlobalScriptRegistry = new ScriptRegistry();
+	GloablScriptInterface = new ScriptInterface();
+	GlobalEntityRenderer = new EntityRenderer();
 }
 #pragma endregion
 
 #pragma region LoadRegistries
-bool BR92Engine::LoadRegistries(char* textures, char* tiles) {
+bool BR92Engine::LoadRegistries(char* textures, char* tiles, char* entities, char* scripts) {
     if (textures == nullptr) {
         textures = AssetPath::root("textures", "json");
     }
@@ -39,6 +45,18 @@ bool BR92Engine::LoadRegistries(char* textures, char* tiles) {
     if (!GlobalMapTileRegistry->load(tiles, GlobalTextureRegistry)) {
         return false;
     }
+	if (scripts == nullptr) {
+		scripts = AssetPath::root("scripts", "json");
+	}
+	if (!GlobalScriptRegistry->load(scripts, GloablScriptInterface)) {
+		return false;
+	}
+	if (entities == nullptr) {
+		entities = AssetPath::root("entities", "json");
+	}
+	if (!GlobalEntityRegistry->load(entities, GlobalTextureRegistry)) {
+		return false;
+	}
     return true;
 }
 #pragma endregion
@@ -56,19 +74,19 @@ void BR92Engine::LoadConfigs() {
 
 #pragma region LoadData
 void BR92Engine::LoadData() {
-    if (map == nullptr) {
-        map = new MapData();
+    if (GlobalMapData == nullptr) {
+        GlobalMapData = new MapData();
     }
-	map->SetTextureRegistry(GlobalTextureRegistry);
-	map->SetTileRegistry(GlobalMapTileRegistry);
-	map->renderDistance = cfg->getFloat("RenderDistance");
-	map->fogColor[0] = scfg->getByte("FogColorR") * 1/255.0f;
-	map->fogColor[1] = scfg->getByte("FogColorG") * 1/255.0f;
-	map->fogColor[2] = scfg->getByte("FogColorB") * 1/255.0f;
-	map->fogColor[3] = scfg->getByte("FogColorA") * 1/255.0f;
-	map->fogMin = scfg->getFloat("FogMin");
-	map->fogMax = scfg->getFloat("FogMax");
-	map->lightLevel = scfg->getFloat("LightLevel");
+	GlobalMapData->SetTextureRegistry(GlobalTextureRegistry);
+	GlobalMapData->SetTileRegistry(GlobalMapTileRegistry);
+	GlobalMapData->renderDistance = cfg->getFloat("RenderDistance");
+	GlobalMapData->fogColor[0] = scfg->getByte("FogColorR") * 1/255.0f;
+	GlobalMapData->fogColor[1] = scfg->getByte("FogColorG") * 1/255.0f;
+	GlobalMapData->fogColor[2] = scfg->getByte("FogColorB") * 1/255.0f;
+	GlobalMapData->fogColor[3] = scfg->getByte("FogColorA") * 1/255.0f;
+	GlobalMapData->fogMin = scfg->getFloat("FogMin");
+	GlobalMapData->fogMax = scfg->getFloat("FogMax");
+	GlobalMapData->lightLevel = scfg->getFloat("LightLevel");
 }
 #pragma endregion
 
@@ -82,7 +100,7 @@ bool BR92Engine::LoadLevel(char* name) {
 	RBuffer readbuf;
 	readbuf.open(levelFileName);
 	if (readbuf.available() > 0) {
-		if (!map->LoadMap(readbuf)) {
+		if (!GlobalMapData->LoadMap(readbuf)) {
 			AssetFormatError(levelFileName);
             return false;
 		}
@@ -93,13 +111,9 @@ bool BR92Engine::LoadLevel(char* name) {
 	// if (!map->HasLoadedLightmaps()) {
 	// 	map->BuildLighting();
 	// }
-	map->GenerateMesh();
-	map->UploadMap();
-	entities.clear();
-	RegisteredTexture* tex = GlobalTextureRegistry->of("entityMonster");
-	if (tex != nullptr) {
-		entities.append(new Entity(tex->id, {10, 0.01, 0}, 1.5705, 1.6));
-	}
+	GlobalMapData->GenerateMesh();
+	GlobalMapData->UploadMap();
+	GlobalEntityRenderer->clear();
     Vector3 delta = Vector3Subtract(camera.target, camera.position);
     camera.position = {0, PLAYER_HEIGHT, 0};
     camera.target = {delta.x, delta.y+PLAYER_HEIGHT, delta.z};
@@ -109,7 +123,7 @@ bool BR92Engine::LoadLevel(char* name) {
 
 #pragma region UnloadLevel
 void BR92Engine::UnloadLevel() {
-    map->ClearMap();
+    GlobalMapData->ClearMap();
 }
 #pragma endregion
 
@@ -168,7 +182,11 @@ void BR92Engine::OpenWindow(char* title) {
 	SetWindowMinSize(320, 240);
 	SetTargetFPS(targetFps);
 	SetExitKey(-1);
-	entities.init();
+	GlobalEntityRenderer->init();
+	postShader = ShaderLoader::load(AssetPath::shader("post"));
+	glGenVertexArrays(1, &postVao);
+
+	SetMousePosition(300, 220);
 }
 #pragma endregion
 
@@ -177,9 +195,10 @@ void BR92Engine::InitMesher() {
 	float aspect = GetRenderHeight() / (float)GetRenderWidth();
 	renderScale = cfg->getUnsigned("RenderScale");
 	gameTexture = LoadRenderTexture(renderScale, renderScale*aspect);
+	screenTexture = LoadRenderTexture(GetRenderWidth(), GetRenderHeight());
 
-	map->BuildAtlas();
-	map->InitMesher(gameTexture.depth.id);
+	GlobalMapData->BuildAtlas();
+	GlobalMapData->InitMesher(gameTexture.depth.id);
 }
 #pragma endregion
 
@@ -240,6 +259,7 @@ void BR92Engine::BeforeMainLoop() {
 	freecam = false;
 	godmode = false;
 	noclip = false;
+	post_process_enabled = false;
 	if (cheats_enabled) {
 		freecam = cfg->getBool("FreecamEnabled");
 		godmode = cfg->getBool("GodmodeEnabled");
@@ -277,33 +297,64 @@ bool BR92Engine::TryLoadLevel(char* name) {
 
 #pragma region Draw
 void BR92Engine::Draw() {
+		if (IsWindowResized()) {
+			ResizeWindow();
+		}
 #pragma region Begin Drawing
 		BeginDrawing();
 		// ClearBackground(BLACK);
 
+		// render the scene
 		BeginTextureMode(gameTexture);
 		{
 			Color tmp = {
-				(unsigned char)(map->fogColor[0]*255.0f),
-				(unsigned char)(map->fogColor[1]*255.0f),
-				(unsigned char)(map->fogColor[2]*255.0f),
-				(unsigned char)(map->fogColor[3]*255.0f)
+				(unsigned char)(GlobalMapData->fogColor[0]*255.0f),
+				(unsigned char)(GlobalMapData->fogColor[1]*255.0f),
+				(unsigned char)(GlobalMapData->fogColor[2]*255.0f),
+				(unsigned char)(GlobalMapData->fogColor[3]*255.0f)
 			};
 			ClearBackground(tmp);
 		}
 		BeginMode3D(camera);
 
-		map->Draw(camera.position, nullptr, renderScale);
+		GlobalMapData->Draw(camera.position, nullptr, renderScale);
 		// DrawPlane({0,0,0}, {5,5}, GRAY);
-		entities.Draw(map, camera.position, renderScale);
+		GlobalEntityRenderer->Draw(GlobalMapData, camera.position, renderScale);
 
 		EndMode3D();
+
 		EndTextureMode();
+
+		// render the HUD and effects
+		BeginTextureMode(screenTexture);
 
 		DrawTexturePro(gameTexture.texture,
 			{0, (float)-gameTexture.texture.height, (float)gameTexture.texture.width, (float)-gameTexture.texture.height},
 			{0, 0, (float)GetRenderWidth(), (float)GetRenderHeight()},
 			{0,0}, 0.0f, WHITE);
+
+
+		EndTextureMode();
+
+		if (post_process_enabled && IsShaderReady(postShader)) {
+			glUseProgram(postShader.id);
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, screenTexture.texture.id);
+			unsigned int loc = GetShaderLocation(postShader, "screenTexture");
+			glUniform1i(loc, 0);
+			loc = GetShaderLocation(postShader, "resolution");
+			glUniform2f(loc, screenTexture.texture.width, screenTexture.texture.height);
+			glDisable(GL_DEPTH_TEST);
+			glBindVertexArray(postVao);
+			glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+			glBindVertexArray(0);
+			glUseProgram(0);
+		} else {
+			DrawTexturePro(screenTexture.texture,
+				{0, (float)-screenTexture.texture.height, (float)screenTexture.texture.width, (float)-screenTexture.texture.height},
+				{0, 0, (float)GetRenderWidth(), (float)GetRenderHeight()},
+				{0,0}, 0.0f, WHITE);
+		}
 
         char buffer[64];
         DrawRectangle(1, 0, GetRenderWidth()-2, 23, DARKGRAY);
@@ -315,8 +366,6 @@ void BR92Engine::Draw() {
         sprintf(buffer, "%d", (int)camera.position.z);
         DrawText(buffer, 200, 3, 20, WHITE);
 		DrawFPS(4, 4);
-
-
 
 		if (drawing_menus) {
 			rlImGuiBegin();
@@ -371,11 +420,18 @@ void BR92Engine::Draw() {
 					ToggleFullscreen();
 				}
 				if (ImGui::SliderFloat("Mouse Sensitivity", &mouseSensitivity, 0.05f, 1.0f)) {}
-				if (ImGui::SliderFloat("Render Distance", &map->renderDistance, 10.0f, 200.0f)) {}
+				if (ImGui::SliderFloat("Render Distance", &GlobalMapData->renderDistance, 10.0f, 200.0f)) {}
 				if (ImGui::SliderInt("Render Scale", &renderScale, 320, 8192)) {
-					UnloadRenderTexture(gameTexture);
-					float aspect = GetRenderHeight() / (float)GetRenderWidth();
-					gameTexture = LoadRenderTexture(renderScale, renderScale*aspect);
+					ResizeWindow();
+				}
+				ImGui::Checkbox("Enable Post-processing", &post_process_enabled);
+				if (ImGui::Button("Take Screenshot (F2)")) {
+					this->TakeScreenshot(screenTexture.texture);
+				}
+				if (gameTexture.texture.width > 8192 || gameTexture.texture.height > 8192) {
+					ImGui::Text("Full-res screen screenshot unavailable (>8192px)");
+				} else if (ImGui::Button("Take Full-res Screenshot")) {
+					this->TakeScreenshot(gameTexture.texture);
 				}
 				ImGui::End();
 			}
@@ -385,10 +441,10 @@ void BR92Engine::Draw() {
 			/* Shader Config Menu */
 			if (dev_enabled) {
 				ImGui::Begin("Shader Config");
-				if (ImGui::ColorEdit4("Fog Color", map->fogColor)) {}
-				if (ImGui::SliderFloat("Fog Min", &map->fogMin, 0.01f, 100.0f)) {}
-				if (ImGui::SliderFloat("Fog Max", &map->fogMax, 0.01f, 100.0f)) {}
-				if (ImGui::SliderFloat("Light", &map->lightLevel, 0.01f, 2.0f)) {}
+				if (ImGui::ColorEdit4("Fog Color", GlobalMapData->fogColor)) {}
+				if (ImGui::SliderFloat("Fog Min", &GlobalMapData->fogMin, 0.01f, 100.0f)) {}
+				if (ImGui::SliderFloat("Fog Max", &GlobalMapData->fogMax, 0.01f, 100.0f)) {}
+				if (ImGui::SliderFloat("Light", &GlobalMapData->lightLevel, 0.01f, 2.0f)) {}
 				ImGui::End();
 			}
 #pragma endregion
@@ -421,7 +477,7 @@ void BR92Engine::Draw() {
 				static Vector3 fillPosition2 = {0,0,0};
 				ImGui::Begin("Dev Menu");
 				if (ImGui::Button("Save Map")) {
-					map->SaveMap(levelFileName);
+					GlobalMapData->SaveMap(levelFileName);
 				}
 				ImGui::Checkbox("Save on Exit", &save_on_exit);
 				// lightChanged |= ImGui::SliderFloat("Light value", &dev_lightValue, 0, 255);
@@ -511,8 +567,8 @@ void BR92Engine::HandleInputs(float dt) {
                 CameraMoveUp(&camera, -delta);
             }
         } else {
-            Vector3 adjustedPosition = map->MoveTo(oldPosition, movement, noclip);
-            adjustedPosition = map->ApplyGravity(adjustedPosition, playerMomentumVertical, dt);
+            Vector3 adjustedPosition = GlobalMapData->MoveTo(oldPosition, movement, noclip);
+            adjustedPosition = GlobalMapData->ApplyGravity(adjustedPosition, playerMomentumVertical, dt);
             Vector3 delta = Vector3Subtract(adjustedPosition, camera.position);
             camera.position = Vector3Add(camera.position, delta);
             camera.target = Vector3Add(camera.target, delta);
@@ -526,14 +582,7 @@ void BR92Engine::HandleInputs(float dt) {
             dev_enabled = !dev_enabled;
         }
         if (IsKeyPressed(KEY_F2)) {
-            char buf[256];
-            time_t t = time(nullptr);
-            struct tm ts;
-            localtime_s(&ts, &t);
-            strftime(buf, sizeof(buf), "BR92shot_%Y_%A_%B_%d_%I_%M_%S_%p.png", &ts);
-            Image screenimg = LoadImageFromTexture(gameTexture.texture);
-            ImageFlipVertical(&screenimg);
-            ExportImage(screenimg, buf);
+			this->TakeScreenshot(screenTexture.texture);
         }
     }
 
@@ -553,9 +602,8 @@ void BR92Engine::HandleInputs(float dt) {
 
 #pragma region Update
 void BR92Engine::Update(float dt) {
-	for (size_t i=0; i<entities.length(); i++) {
-		Entity* ent = entities[i];
-		ent->Rotate(0.25*3.141*dt);
+	if (!drawing_menus) {
+		GlobalEntityRenderer->Update(GlobalMapData, camera.position, dt);
 	}
 }
 #pragma endregion
@@ -563,7 +611,7 @@ void BR92Engine::Update(float dt) {
 #pragma region EndWindow
 void BR92Engine::EndWindow() {
 	if (save_on_exit) {
-		map->SaveMap(levelFileName);
+		GlobalMapData->SaveMap(levelFileName);
 	}
 
 	rlImGuiShutdown();
@@ -591,7 +639,7 @@ void BR92Engine::SaveConfigs() {
     cfg->setFloat("PlayerUX", camera.up.x);
     cfg->setFloat("PlayerUY", camera.up.y);
     cfg->setFloat("PlayerUZ", camera.up.z);
-	cfg->setFloat("RenderDistance", map->renderDistance);
+	cfg->setFloat("RenderDistance", GlobalMapData->renderDistance);
 	cfg->setFloat("MouseSensitivity", mouseSensitivity);
 	cfg->setBool("CheatsEnabled", cheats_enabled);
 	cfg->setBool("FreecamEnabled", freecam);
@@ -600,13 +648,41 @@ void BR92Engine::SaveConfigs() {
 	cfg->setUnsigned("RenderScale", renderScale);
 	cfg->save();
 
-	scfg->setByte("FogColorR", map->fogColor[0]*255.0f);
-	scfg->setByte("FogColorG", map->fogColor[1]*255.0f);
-	scfg->setByte("FogColorB", map->fogColor[2]*255.0f);
-	scfg->setByte("FogColorA", map->fogColor[3]*255.0f);
-	scfg->setFloat("FogMin", map->fogMin);
-	scfg->setFloat("FogMax", map->fogMax);
-	scfg->setFloat("LightLevel", map->lightLevel);
+	scfg->setByte("FogColorR", GlobalMapData->fogColor[0]*255.0f);
+	scfg->setByte("FogColorG", GlobalMapData->fogColor[1]*255.0f);
+	scfg->setByte("FogColorB", GlobalMapData->fogColor[2]*255.0f);
+	scfg->setByte("FogColorA", GlobalMapData->fogColor[3]*255.0f);
+	scfg->setFloat("FogMin", GlobalMapData->fogMin);
+	scfg->setFloat("FogMax", GlobalMapData->fogMax);
+	scfg->setFloat("LightLevel", GlobalMapData->lightLevel);
 	scfg->save();
 }
+#pragma endregion
+
+#pragma region TakeScreenshot
+
+void BR92Engine::TakeScreenshot(Texture2D texture) {
+	char buf[128];
+	time_t t = time(nullptr);
+	struct tm ts;
+	localtime_s(&ts, &t);
+	strftime(buf, sizeof(buf), "BR92shot_%Y_%A_%B_%d_%I_%M_%S_%p.png", &ts);
+	Image screenimg = LoadImageFromTexture(texture);
+	ImageFlipVertical(&screenimg);
+	ExportImage(screenimg, buf);
+	UnloadImage(screenimg);
+}
+
+#pragma endregion
+
+#pragma region ResizeWindow
+
+void BR92Engine::ResizeWindow() {
+	UnloadRenderTexture(gameTexture);
+	UnloadRenderTexture(screenTexture);
+	float aspect = GetRenderHeight() / (float)GetRenderWidth();
+	gameTexture = LoadRenderTexture(renderScale, renderScale*aspect);
+	screenTexture = LoadRenderTexture(GetRenderWidth(), GetRenderHeight());
+}
+
 #pragma endregion

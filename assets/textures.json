@@ -55,6 +55,8 @@
 		"wall1upper",
 		"wall3mid",
 		"wall3alt1mid",
-		"entityMonster"
+		"entitySmoggFrame1",
+		"entitySmoggFrame2",
+		"entitySmoggFrame3"
 	]
 }

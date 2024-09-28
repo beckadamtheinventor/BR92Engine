@@ -1,0 +1,8 @@
+{
+    "elements": [
+        {
+            "id": "enemy_smoke_cloud_script",
+            "script": "scripts/enemy_smoke_cloud_script.txt"
+        }
+    ]
+}

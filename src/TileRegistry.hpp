@@ -31,6 +31,7 @@ class MapTileRegistry : public Registry<MapTile> {
     public:
     bool load(const char* fname, TextureRegistry* GlobalTextureRegistry) {
         // load map tiles into registry
+        fname = AssetPath::clone(fname);
         RegisteredTexture* nonetex = GlobalTextureRegistry->of("none");
         MapTile* tile = this->add("none");
         tile->floor = tile->ceiling = tile->wall = nonetex->id;
@@ -38,7 +39,7 @@ class MapTileRegistry : public Registry<MapTile> {
         tile->light = tile->tintr = tile->tintg = tile->tintb = 0;
 
         char* datastr;
-        std::ifstream fd(AssetPath::root("tiles", "json"));
+        std::ifstream fd(fname);
 
         if (fd.is_open()) {
             size_t count = fstreamlen(fd);
@@ -57,7 +58,7 @@ class MapTileRegistry : public Registry<MapTile> {
                         if (o.has("id") && o["id"].getType() == JSON::Type::String) {
                             id = o["id"].getCString();
                         } else {
-                            JsonFormatError("tiles.json", "Elements array contains invalid member (missing id)");
+                            JsonFormatError(fname, "Elements array contains invalid member (missing string id)");
                             return false;
                         }
                         MapTile* tile = this->add(id);
@@ -72,7 +73,7 @@ class MapTileRegistry : public Registry<MapTile> {
                                 if (GlobalTextureRegistry->has(f)) {
                                     tile->floor = GlobalTextureRegistry->of(f)->id;
                                 } else {
-                                    JsonFormatError("tiles.json", "Elements array member contains unknown texture id", f);
+                                    JsonFormatError(fname, "Elements array member contains unknown texture id", f);
                                     return false;
                                 }
                             } else if (o["f"].getType() == JSON::Type::Integer) {
@@ -81,15 +82,15 @@ class MapTileRegistry : public Registry<MapTile> {
                                     if (GlobalTextureRegistry->has(i)) {
                                         tile->floor = i;
                                     } else {
-                                        JsonFormatError("tiles.json", "Elements array member contains unknown tile id number", i);
+                                        JsonFormatError(fname, "Elements array member contains unknown tile id number", i);
                                         return false;
                                     }
                                 } else {
-                                    JsonFormatError("tiles.json", "Elements array member contains out of bound tile id number", i);
+                                    JsonFormatError(fname, "Elements array member contains out of bound tile id number", i);
                                     return false;
                                 }
                             } else {
-                                JsonFormatError("tiles.json", "Elements array member contains invalid value for field", "f");
+                                JsonFormatError(fname, "Elements array member contains invalid value for field", "f");
                                 return false;
                             }
                         }
@@ -102,7 +103,7 @@ class MapTileRegistry : public Registry<MapTile> {
                                 if (GlobalTextureRegistry->has(f)) {
                                     tile->ceiling = GlobalTextureRegistry->of(f)->id;
                                 } else {
-                                    JsonFormatError("tiles.json", "Elements array member contains unknown texture id", f);
+                                    JsonFormatError(fname, "Elements array member contains unknown texture id", f);
                                     return false;
                                 }
                             } else if (o["c"].getType() == JSON::Type::Integer) {
@@ -111,15 +112,15 @@ class MapTileRegistry : public Registry<MapTile> {
                                     if (GlobalTextureRegistry->has(i)) {
                                         tile->ceiling = i;
                                     } else {
-                                        JsonFormatError("tiles.json", "Elements array member contains unknown tile id number", i);
+                                        JsonFormatError(fname, "Elements array member contains unknown tile id number", i);
                                         return false;
                                     }
                                 } else {
-                                    JsonFormatError("tiles.json", "Elements array member contains out of bound tile id number", i);
+                                    JsonFormatError(fname, "Elements array member contains out of bound tile id number", i);
                                     return false;
                                 }
                             } else {
-                                JsonFormatError("tiles.json", "Elements array member contains invalid value type for field", "c");
+                                JsonFormatError(fname, "Elements array member contains invalid value type for field", "c");
                                 return false;
                             }
                         }
@@ -132,7 +133,7 @@ class MapTileRegistry : public Registry<MapTile> {
                                 if (GlobalTextureRegistry->has(f)) {
                                     tile->wall = GlobalTextureRegistry->of(f)->id;
                                 } else {
-                                    JsonFormatError("tiles.json", "Elements array member contains unknown texture id", f);
+                                    JsonFormatError(fname, "Elements array member contains unknown texture id", f);
                                     return false;
                                 }
                             } else if (o["w"].getType() == JSON::Type::Integer) {
@@ -141,15 +142,15 @@ class MapTileRegistry : public Registry<MapTile> {
                                     if (GlobalTextureRegistry->has(i)) {
                                         tile->wall = i;
                                     } else {
-                                        JsonFormatError("tiles.json", "Elements array member contains unknown tile id number", i);
+                                        JsonFormatError(fname, "Elements array member contains unknown tile id number", i);
                                         return false;
                                     }
                                 } else {
-                                    JsonFormatError("tiles.json", "Elements array member contains out of bound tile id number", i);
+                                    JsonFormatError(fname, "Elements array member contains out of bound tile id number", i);
                                     return false;
                                 }
                             } else {
-                                JsonFormatError("tiles.json", "Elements array member contains invalid value type (should be integer or string) for field", "w");
+                                JsonFormatError(fname, "Elements array member contains invalid value type (should be integer or string) for field", "w");
                                 return false;
                             }
                         }
@@ -157,7 +158,7 @@ class MapTileRegistry : public Registry<MapTile> {
                             if (o["solid"].getType() == JSON::Type::Boolean) {
                                 tile->isSolid = o["solid"].getBoolean();
                             } else {
-                                JsonFormatError("tiles.json", "Elements array member contains invalid value type (should be bool) for field", "solid");
+                                JsonFormatError(fname, "Elements array member contains invalid value type (should be bool) for field", "solid");
                                 return false;
                             }
                         }
@@ -165,7 +166,7 @@ class MapTileRegistry : public Registry<MapTile> {
                             if (o["spawnable"].getType() == JSON::Type::Boolean) {
                                 tile->isSpawnable = o["spawnable"].getBoolean();
                             } else {
-                                JsonFormatError("tiles.json", "Elements array member contains invalid value type (should be bool) for field", "spawnable");
+                                JsonFormatError(fname, "Elements array member contains invalid value type (should be bool) for field", "spawnable");
                                 return false;
                             }
                         }
@@ -173,7 +174,7 @@ class MapTileRegistry : public Registry<MapTile> {
                             if (o["wall"].getType() == JSON::Type::Boolean) {
                                 tile->isSolid = o["wall"].getBoolean();
                             } else {
-                                JsonFormatError("tiles.json", "Elements array member contains invalid value type (should be bool) for field", "wall");
+                                JsonFormatError(fname, "Elements array member contains invalid value type (should be bool) for field", "wall");
                                 return false;
                             }
                         }
@@ -181,7 +182,7 @@ class MapTileRegistry : public Registry<MapTile> {
                             if (o["blockslight"].getType() == JSON::Type::Boolean) {
                                 tile->blocksLight = o["blockslight"].getBoolean();
                             } else {
-                                JsonFormatError("tiles.json", "Elements array member contains invalid value type (should be bool) for field", "blockslight");
+                                JsonFormatError(fname, "Elements array member contains invalid value type (should be bool) for field", "blockslight");
                                 return false;
                             }
                         }
@@ -189,7 +190,7 @@ class MapTileRegistry : public Registry<MapTile> {
                             if (o["solidfloor"].getType() == JSON::Type::Boolean) {
                                 tile->solidFloor = o["solidfloor"].getBoolean();
                             } else {
-                                JsonFormatError("tiles.json", "Elements array member contains invalid value type (should be bool) for field", "solidfloor");
+                                JsonFormatError(fname, "Elements array member contains invalid value type (should be bool) for field", "solidfloor");
                                 return false;
                             }
                         }
@@ -197,7 +198,7 @@ class MapTileRegistry : public Registry<MapTile> {
                             if (o["solidceiling"].getType() == JSON::Type::Boolean) {
                                 tile->solidCeiling = o["solidceiling"].getBoolean();
                             } else {
-                                JsonFormatError("tiles.json", "Elements array member contains invalid value type (should be bool) for field", "solidceiling");
+                                JsonFormatError(fname, "Elements array member contains invalid value type (should be bool) for field", "solidceiling");
                                 return false;
                             }
                         }
@@ -205,7 +206,7 @@ class MapTileRegistry : public Registry<MapTile> {
                             if (o["light"].getType() == JSON::Type::Integer) {
                                 tile->light = o["light"].getInteger();
                             } else {
-                                JsonFormatError("tiles.json", "Elements array mamber contains invalid value type (should be integer) for field", "light");
+                                JsonFormatError(fname, "Elements array mamber contains invalid value type (should be integer) for field", "light");
                                 return false;
                             }
                         }
@@ -213,20 +214,20 @@ class MapTileRegistry : public Registry<MapTile> {
                             if (o["tint"].getType() == JSON::Type::Array) {
                                 JSON::JSONArray& arr = o["tint"].getArray();
                                 if (arr.length != 3) {
-                                    JsonFormatError("tiles.json", "Elements array member conatins invalid value type (should be 3-component integer array) for field", "tint");
+                                    JsonFormatError(fname, "Elements array member conatins invalid value type (should be 3-component integer array) for field", "tint");
                                     return false;
                                 }
                                 if (arr.members[0].getType() != JSON::Type::Integer ||
                                     arr.members[1].getType() != JSON::Type::Integer ||
                                     arr.members[2].getType() != JSON::Type::Integer) {
-                                        JsonFormatError("tiles.json", "Elements array member conatins invalid value type (should be 3-component integer array) for field", "tint");
+                                        JsonFormatError(fname, "Elements array member conatins invalid value type (should be 3-component integer array) for field", "tint");
                                         return false;
                                 }
                                 tile->tintr = arr.members[0].getInteger();
                                 tile->tintg = arr.members[1].getInteger();
                                 tile->tintb = arr.members[2].getInteger();
                             } else {
-                                JsonFormatError("tiles.json", "Elements array mamber contains invalid value type (should be 3-component integer array) for field", "tint");
+                                JsonFormatError(fname, "Elements array mamber contains invalid value type (should be 3-component integer array) for field", "tint");
                                 return false;
                             }
                         } else {
@@ -237,13 +238,14 @@ class MapTileRegistry : public Registry<MapTile> {
                     }
                 }
             } else {
-                JsonFormatError("tiles.json", "Expected member \"elements\" in root containing an array of objects");
+                JsonFormatError(fname, "Expected member \"elements\" in root containing an array of objects");
                 return false;
             }
         } else {
-            MissingAssetError(AssetPath::root("tiles", "json"));
+            MissingAssetError(fname);
             return false;
         }
+        delete [] fname;
         return true;
     }
 };

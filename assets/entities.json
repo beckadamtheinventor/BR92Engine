@@ -1,0 +1,18 @@
+{
+    "elements": [
+        {
+            "id": "enemy_smoke_cloud",
+            "name": "Smogg",
+            "textures": [
+                "entitySmoggFrame1",
+                "entitySmoggFrame2",
+                "entitySmoggFrame3",
+                "entitySmoggFrame2"
+            ],
+            "frametime": 1.2857,
+            "canmove": true,
+            "facesplayer": true,
+            "script": "enemy_smoke_cloud_script"
+        }
+    ]
+}

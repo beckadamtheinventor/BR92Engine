@@ -10,6 +10,8 @@
 #include <cmath>
 #include <thread>
 
+MapData* GlobalMapData=nullptr;
+
 #pragma region Const Data
 static const constexpr char cubeverts[] = {
     // +y
@@ -135,6 +137,10 @@ bool MapData::LoadMapChunk(RBuffer& data) {
         if (!data.readV<float>(&fogMax)) {
             return false;
         }
+    } else if (magic == LIGHT_MULTIPLIER_MAGIC_NUMBER) {
+        if (!data.readV<float>(&lightLevel)) {
+            return false;
+        }
     }
     return true;
 }
@@ -194,8 +200,13 @@ bool MapData::LoadMapTiles(RBuffer& data) {
             tid |= c << 8;
             map[{xx, zz}] = tid;
             MapTile* tile = tileRegistry->of(tid);
-            if (tile != nullptr && tile->light > 0) {
-                lightList.append({x+xx, y, z+zz, tile->light, tile->tintr, tile->tintg, tile->tintb});
+            if (tile != nullptr) {
+                if (tile->light > 0) {
+                    lightList.append({x+xx, y, z+zz, tile->light, tile->tintr, tile->tintg, tile->tintb});
+                }
+                if (tile->isSpawnable) {
+                    spawnableSpaces.append({(float)x+xx, (float)y, (float)z+zz});
+                }
             }
         }
     }
@@ -397,8 +408,11 @@ Vector3 MapData::RayCast(Vector3 pos, Vector3 dir, HitInfo& hit, size_t max_step
     Vector3 p = pos;
     hit.flags = 0;
     for (size_t i=0; i<max_steps; i++) {
-        if (tileRegistry->of(get(p.x, p.y, p.z))->isSolid) {
+        MapTile* tile = tileRegistry->of(get(p.x, p.y, p.z));
+        if (tile != nullptr && tile->isSolid) {
             hit.hitWall = true;
+            hit.distance = Vector3Distance(pos, p);
+            break;
         }
         p = Vector3Add(p, dir);
     }

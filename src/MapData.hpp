@@ -16,10 +16,12 @@
 #define LIGHT_MAP_MAGIC_NUMBER_STR "LMAP"
 #define WALL_MAP_MAGIC_NUMBER_STR "WALL"
 #define FOG_MAGIC_NUMBER_STR "FOGC"
+#define LIGHT_MULTIPLIER_MAGIC_NUMBER_STR "LMUL"
 #define TILE_MAP_MAGIC_NUMBER   (*(uint32_t*)TILE_MAP_MAGIC_NUMBER_STR)
 #define LIGHT_MAP_MAGIC_NUMBER  (*(uint32_t*)LIGHT_MAP_MAGIC_NUMBER_STR)
 #define WALL_MAP_MAGIC_NUMBER   (*(uint32_t*)WALL_MAP_MAGIC_NUMBER_STR)
 #define FOG_MAGIC_NUMBER        (*(uint32_t*)FOG_MAGIC_NUMBER_STR)
+#define LIGHT_MULTIPLIER_MAGIC_NUMBER (*(uint32_t*)LIGHT_MULTIPLIER_MAGIC_NUMBER_STR)
 
 #define LIGHT_RANGE 6
 #define PLAYER_HEIGHT 0.4f
@@ -101,6 +103,7 @@ class LightMap {
 
 #pragma region HitInfo
 struct HitInfo {
+    float distance;
     unsigned short tileid;
     union {
         unsigned char flags;
@@ -125,8 +128,8 @@ class MapData {
     unsigned int depthTextureId;
     bool hasLoadedLightmaps = false;
     public:
-    Shader mainShader;
-    Shader spriteShader;
+    DynamicArray<Vector3> spawnableSpaces;
+    Shader mainShader, spriteShader;
     Texture2D atlas = {0};
     float fogMin, fogMax, fogColor[4], lightLevel, renderDistance;
     void BuildAtlas();
@@ -168,4 +171,7 @@ class MapData {
     Vector3 MoveTo(Vector3 position, Vector3 move, bool noclip=false);
     Vector3 ApplyGravity(Vector3 position, float& momentum, float dt);
 };
+
+extern MapData* GlobalMapData;
+
 #pragma endregion

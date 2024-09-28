@@ -3,9 +3,6 @@
 #include "raylib.h"
 #include "rcamera.h"
 #include "Helpers.hpp"
-#include "Engine.hpp"
-
-#define PLAYER_SPEED 1.2f
 
 #pragma region main()
 int main(void)

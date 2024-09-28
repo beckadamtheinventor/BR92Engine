@@ -86,14 +86,14 @@ class TextureRegistry : public Registry<RegisteredTexture> {
                     }
                 }
             } else {
-                JsonFormatError("textures.json", "Expected member \"elements\" in root containing an array of strings");
+                JsonFormatError(fname, "Expected member \"elements\" in root containing an array of strings");
                 return false;
             }
         } else {
             MissingAssetError(AssetPath::root("textures", "json"));
             return false;
         }
-        delete fname;
+        delete [] fname;
         return true;
     }
 };
