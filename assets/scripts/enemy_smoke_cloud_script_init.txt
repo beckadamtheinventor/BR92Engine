@@ -1,0 +1,17 @@
+
+i8 1
+push
+i8 20
+itof
+push
+i8 5
+itof
+push
+arg 0
+randomTeleportEntity
+
+i8 0
+itof
+push
+arg 0
+setEntityTimer

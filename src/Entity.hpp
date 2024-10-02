@@ -8,6 +8,7 @@
 #include "raylib.h"
 #include "rlgl.h"
 #include "raymath.h"
+#include <cmath>
 #include <ios>
 
 #define OpenGLDebug(s) if (GLenum e = glGetError()) printf("%s: OpenGL Error: %u\n", s, e)
@@ -18,15 +19,27 @@ class Entity {
     float rot, scale;
     unsigned short tno;
     unsigned short type;
-    float timer;
+    float timer, frametimer;
+    unsigned char frameno;
 
-    Entity(unsigned short t, unsigned short ty=0, Vector3 p={0,0,0}, float r=0.0, float s=1.0) {
-        tno = t;
+    Entity(unsigned short ty=0, Vector3 p={0,0,0}, float r=0.0, float s=1.0f) {
+        EntityType* entt = GlobalEntityRegistry->of(ty);
+        if (entt != nullptr) {
+            tno = entt->textures[0];
+            type = ty;
+        } else {
+            tno = 0;
+            type = 0;
+        }
         pos = p;
         rot = r;
-        scale = s;
-        type = ty;
-        timer = 0;
+        scale = entt->scale * s;
+        timer = frametimer = 0.0f;
+        frameno = 0;
+    }
+
+    bool valid() {
+        return type != 0 && GlobalEntityRegistry->of(type) != nullptr;
     }
 
     void Rotate(float r, bool set=false) {
@@ -68,7 +81,7 @@ class EntityRenderer : public DynamicArray<Entity*> {
         0, 0.25, 2,
     };
     public:
-    void init() {
+    void PreInit() {
         glGenVertexArrays(1, &vao);
         glGenBuffers(1, &vbo);
         glBindVertexArray(vao);
@@ -77,15 +90,33 @@ class EntityRenderer : public DynamicArray<Entity*> {
         glVertexAttribPointer(0, 3, GL_FLOAT, false, sizeof(float)*3, nullptr);
         glEnableVertexAttribArray(0);
     }
-    Entity* add(unsigned short tno, unsigned short type, Vector3 pos, float rot=0) {
-        Entity* ent = new Entity(tno, type, pos, rot);
+    Entity* Add(unsigned short type, Vector3 pos, float rot=0) {
+        Entity* ent = new Entity(type, pos, rot);
         append(ent);
         return ent;
     }
-    Entity* add(unsigned short tno, Vector3 pos, float rot=0) {
-        Entity* ent = new Entity(tno, 0, pos, rot);
-        append(ent);
-        return ent;
+
+    void Init() {
+        for (size_t i=0; i<length(); i++) {
+            Entity* ent = get(i);
+            if (ent == nullptr) {
+                continue;
+            }
+            EntityType* ent_type = GlobalEntityRegistry->of(ent->type);
+            if (ent_type == nullptr) {
+                continue;
+            }
+            Script* script = GlobalScriptRegistry->of(ent_type->script_init);
+            if (script == nullptr) {
+                continue;
+            }
+            long long rval[8] = {0};
+            long long argv[2] = {(signed)i, ent->frameno};
+            int res = script->code.run(2, argv, rval);
+            if (res != ScriptBytecode::Result::Success) {
+                TraceLog(LOG_ERROR, "Script %u (Init) exited with code %d", i, res);
+            }
+        }
     }
 
     void Update(MapData* map, Vector3 camera, float dt) {
@@ -100,9 +131,18 @@ class EntityRenderer : public DynamicArray<Entity*> {
             }
             if (ent_type->facesplayer) {
                 Vector3 dir = Vector3Subtract(ent->pos, camera);
-                float rot = atan2f(dir.z, dir.x);
+                float rot = -atan2f(dir.z, dir.x);
                 ent->Rotate(rot, true);
             }
+            ent->frametimer += dt;
+            if (ent->frametimer >= ent_type->frametime) {
+                ent->frametimer -= ent_type->frametime;
+                ent->frameno++;
+            }
+            if (ent->frameno >= ent_type->nframes) {
+                ent->frameno = 0;
+            }
+            ent->tno = ent_type->textures[ent->frameno];
             if (ent_type->script == 0) {
                 continue;
             }
@@ -110,20 +150,11 @@ class EntityRenderer : public DynamicArray<Entity*> {
             if (script == nullptr) {
                 continue;
             }
-            long long rval = 0;
-            long long argv[2] = {(signed)i, ent->tno};
-            int res = script->code.run(2, argv, &rval);
+            long long rval[8] = {0};
+            long long argv[2] = {(signed)i, ent->frameno};
+            int res = script->code.run(2, argv, rval);
             if (res != ScriptBytecode::Result::Success) {
-                char name[64];
-                char* data;
-                size_t len = script->code.dump(&data);
-                snprintf(name, sizeof(name), "script%u_dump.bin", script->id);
-                std::ofstream fd(name, std::ios_base::out | std::ios_base::binary);
-                if (fd.is_open()) {
-                    fd.write(data, len);
-                    fd.close();
-                }
-                ent_type->script = 0;
+                TraceLog(LOG_ERROR, "Script %u (Update) exited with code %d", i, res);
             }
         }
     }

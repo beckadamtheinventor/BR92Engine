@@ -1,0 +1,56 @@
+u64 1.25f
+push
+cameraZ
+push
+cameraY
+push
+cameraX
+push
+arg 0
+entityMoveTowards
+
+arg 0
+canSeePlayer
+bnz @reset_timer
+
+:cant_see_player
+arg 0
+getEntityTimer
+ex
+getDeltaTime
+addf
+push
+arg 0
+setEntityTimer
+
+arg 0
+getEntityTimer
+ex
+i8 5
+itof
+gteq
+bnz @eof
+
+:trigger_teleport
+
+i8 0
+push
+i8 40
+itof
+push
+i8 10
+itof
+push
+arg 0
+randomTeleportEntity
+
+arg0
+canSeePlayer
+bz @eof
+
+:reset_timer
+i8 0
+itof
+push
+arg 0
+setEntityTimer

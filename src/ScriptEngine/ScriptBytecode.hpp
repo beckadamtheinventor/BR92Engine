@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdio>
 #include "ScriptInterface.hpp"
+#include "raylib.h"
 
 class ScriptBytecode {
     typedef union { long long i; double f; } i64;
@@ -18,9 +19,13 @@ class ScriptBytecode {
         Push, Pop, PushB, PopB, BA, BZ, BNZ, JSR, RTS, JSRZ, JSRNZ, RTSZ, RTSNZ,
         EQ, NEQ, GT, LT, GTEQ, LTEQ, EQF, NEQF, GTF, LTF, GTEQF, LTEQF,
         BZSet32, BNZSet32, PushArg, PushVar, Abs, AbsF, Sqrt, SqrtF, Itof, Ftoi,
+        Immediate64, Immediate64U, Immediate64B, Immediate64UB,
 
         GetTileId=0x80, GetLightLevel, TileLightLevel, TileIsSolid, TileIsSpawnable, TileIsWall,
         TileFloor, TileCeiling, TileWall,
+        CameraX, CameraY, CameraZ, EntityX, EntityY, EntityZ,
+        EntityMoveTowards, EntityRotate, EntityTeleport, CanSeePlayer,
+        GetEntityTimer, SetEntityTimer, RandomTeleportEntity, GetDeltaTime,
     };
     static constexpr const unsigned char DO_NOTHING_BYTECODE[] = {Opcode::Return, 0, Opcode::End};
     static constexpr const size_t STACK_SIZE = 64;
@@ -79,6 +84,7 @@ class ScriptBytecode {
         size_t sp = STACK_SIZE;
         i64 acc, bcc;
         long long tmp, tmp2, tmp3, tmp4, tmp5;
+        float tmpf, tmpf2, tmpf3, tmpf4;
         char tmpC;
         short tmpS;
         int tmpI;
@@ -410,6 +416,20 @@ class ScriptBytecode {
                 case Ftoi:
                     acc.i = acc.f;
                     break;
+                case Immediate64:
+                    tmpI = nextl(pc);
+                    acc.i = tmpI;
+                    break;
+                case Immediate64U:
+                    acc.i = nextl(pc);
+                    break;
+                case Immediate64B:
+                    tmpI = nextl(pc);
+                    bcc.i = tmpI;
+                    break;
+                case Immediate64UB:
+                    bcc.i = nextl(pc);
+                    break;
                 case GetTileId:
                     tmp = pop(sp).i;
                     tmp2 = pop(sp).i;
@@ -442,6 +462,61 @@ class ScriptBytecode {
                     break;
                 case TileWall:
                     acc.i = interface->tileWall(acc.i);
+                    break;
+                case CameraX:
+                    acc.f = interface->cameraX();
+                    break;
+                case CameraY:
+                    acc.f = interface->cameraY();
+                    break;
+                case CameraZ:
+                    acc.f = interface->cameraZ();
+                    break;
+                case EntityX:
+                    acc.f = interface->entityX(acc.i);
+                    break;
+                case EntityY:
+                    acc.f = interface->entityY(acc.i);
+                    break;
+                case EntityZ:
+                    acc.f = interface->entityZ(acc.i);
+                    break;
+                case EntityMoveTowards:
+                    tmpf = pop(sp).f;
+                    tmpf2 = pop(sp).f;
+                    tmpf3 = pop(sp).f;
+                    tmpf4 = pop(sp).f;
+                    interface->entityMoveTowards(acc.i, tmpf, tmpf2, tmpf3, tmpf4);
+                    break;
+                case EntityRotate:
+                    tmpf = pop(sp).f;
+                    interface->entityRotate(acc.i, tmpf);
+                    break;
+                case EntityTeleport:
+                    tmpf = pop(sp).f;
+                    tmpf2 = pop(sp).f;
+                    tmpf3 = pop(sp).f;
+                    interface->entityTeleport(acc.i, tmpf, tmpf2, tmpf3);
+                    break;
+                case CanSeePlayer:
+                    acc.i = interface->canSeePlayer(acc.i);
+                    // TraceLog(LOG_INFO, "canSeePlayer: %s", acc.i ? "true" : "false");
+                    break;
+                case GetEntityTimer:
+                    acc.f = interface->getEntityTimer(acc.i);
+                    break;
+                case SetEntityTimer:
+                    tmpf = pop(sp).f;
+                    interface->setEntityTimer(acc.i, tmpf);
+                    break;
+                case RandomTeleportEntity:
+                    tmpf = pop(sp).f;
+                    tmpf2 = pop(sp).f;
+                    tmp = pop(sp).i;
+                    interface->randomTeleportEntity(acc.i, tmpf, tmpf2, tmp);
+                    break;
+                case GetDeltaTime:
+                    acc.f = interface->getDeltaTime();
                     break;
                 default:
                     result = Result::UnknownOpcode;
@@ -494,17 +569,17 @@ class ScriptBytecode {
             result = Result::OutOfBoundsRead;
         }
     }
-    long long nextl(size_t &i) {
+    unsigned long long nextl(size_t &i) {
         unsigned int tmp = nexti(i);
         unsigned int tmp2 = nexti(i);
         return (tmp & 0xffffffff) | ((unsigned long long)tmp2 << 32);
     }
-    int nexti(size_t &i) {
+    unsigned int nexti(size_t &i) {
         unsigned short tmp = nextw(i);
         unsigned short tmp2 = nextw(i);
         return (tmp & 0xffff) | ((unsigned int)tmp2 << 16);
     }
-    short nextw(size_t &i) {
+    unsigned short nextw(size_t &i) {
         unsigned char tmp = next(i);
         unsigned char tmp2 = next(i);
         return (tmp & 0xff) | ((unsigned short)tmp2<<8);

@@ -1,4 +1,6 @@
 
+#include "EntityRegistry.hpp"
+#include "TileRegistry.hpp"
 #include "imgui.h"
 #include "imguiThemes.h"
 #include "raylib.h"
@@ -18,7 +20,9 @@ const char* MAIN_CONFIG_FILE = "config.dat";
 const char* SHADER_CONFIG_FILE = "assets/shaders/cfg.dat";
 const char* DEV_CONFIG_FILE = "dev.dat";
 const char* VERSION_STRING = "0.0.2-indev";
+
 EntityRenderer* GlobalEntityRenderer=nullptr;
+BR92Engine* GlobalEngine=nullptr;
 
 #pragma region Init
 void BR92Engine::Init() {
@@ -28,7 +32,9 @@ void BR92Engine::Init() {
 	GlobalScriptRegistry = new ScriptRegistry();
 	GloablScriptInterface = new ScriptInterface();
 	GlobalEntityRenderer = new EntityRenderer();
+	GlobalEngine = this;
 }
+
 #pragma endregion
 
 #pragma region LoadRegistries
@@ -99,6 +105,7 @@ bool BR92Engine::LoadLevel(char* name) {
     }
 	RBuffer readbuf;
 	readbuf.open(levelFileName);
+	GlobalEntityRenderer->clear();
 	if (readbuf.available() > 0) {
 		if (!GlobalMapData->LoadMap(readbuf)) {
 			AssetFormatError(levelFileName);
@@ -111,9 +118,9 @@ bool BR92Engine::LoadLevel(char* name) {
 	// if (!map->HasLoadedLightmaps()) {
 	// 	map->BuildLighting();
 	// }
+	GlobalEntityRenderer->Init();
 	GlobalMapData->GenerateMesh();
 	GlobalMapData->UploadMap();
-	GlobalEntityRenderer->clear();
     Vector3 delta = Vector3Subtract(camera.target, camera.position);
     camera.position = {0, PLAYER_HEIGHT, 0};
     camera.target = {delta.x, delta.y+PLAYER_HEIGHT, delta.z};
@@ -182,7 +189,7 @@ void BR92Engine::OpenWindow(char* title) {
 	SetWindowMinSize(320, 240);
 	SetTargetFPS(targetFps);
 	SetExitKey(-1);
-	GlobalEntityRenderer->init();
+	GlobalEntityRenderer->PreInit();
 	postShader = ShaderLoader::load(AssetPath::shader("post"));
 	glGenVertexArrays(1, &postVao);
 
@@ -359,12 +366,16 @@ void BR92Engine::Draw() {
         char buffer[64];
         DrawRectangle(1, 0, GetRenderWidth()-2, 23, DARKGRAY);
 		DrawLine(1, 24, GetRenderWidth()-2, 24, BLACK);
-        sprintf(buffer, "%d", (int)camera.position.x);
-        DrawText(buffer, 100, 3, 20, WHITE);
-        sprintf(buffer, "%d", (int)camera.position.y);
-        DrawText(buffer, 150, 3, 20, WHITE);
-        sprintf(buffer, "%d", (int)camera.position.z);
-        DrawText(buffer, 200, 3, 20, WHITE);
+		if (cheats_enabled) {
+			snprintf(buffer, sizeof(buffer), "%d", (int)camera.position.x);
+			DrawText(buffer, 100, 3, 20, WHITE);
+			snprintf(buffer, sizeof(buffer), "%d", (int)camera.position.y);
+			DrawText(buffer, 150, 3, 20, WHITE);
+			snprintf(buffer, sizeof(buffer), "%d", (int)camera.position.z);
+			DrawText(buffer, 200, 3, 20, WHITE);
+			// snprintf(buffer, sizeof(buffer), "%f", GlobalEntityRenderer->get(0)->timer);
+			// DrawText(buffer, 250, 3, 20, WHITE);
+		}
 		DrawFPS(4, 4);
 
 		if (drawing_menus) {
@@ -454,8 +465,12 @@ void BR92Engine::Draw() {
 			if (cheats_enabled) {
                 static char tempLevelName[256] = {0};
 				ImGui::Begin("Cheats");
-				if (ImGui::Checkbox("Freecam", &freecam)) {}
-				if (ImGui::Checkbox("Noclip", &noclip)) {}
+				if (ImGui::Checkbox("Freecam", &freecam)) {
+					playerMomentumVertical = 0;
+				}
+				if (ImGui::Checkbox("Noclip", &noclip)) {
+					playerMomentumVertical = 0;
+				}
 				if (ImGui::Checkbox("Godmode", &godmode)) {}
 				if (ImGui::InputFloat("Speed", &playerSpeed)) {}
                 ImGui::InputText("Path", tempLevelName, sizeof(tempLevelName));
@@ -558,6 +573,17 @@ void BR92Engine::HandleInputs(float dt) {
         if (IsKeyDown(KEY_D)) {
             CameraMoveRight(&camera, delta, !freecam);
         }
+		// if (IsKeyDown(KEY_SPACE)) {
+		// 	unsigned short tid = GlobalMapData->get(oldPosition);
+		// 	if (tid != 0) {
+		// 		MapTile* tile = GlobalMapTileRegistry->of(tid);
+		// 		if (tile != nullptr) {
+		// 			if (tile->solidFloor) {
+		// 				playerMomentumVertical += PLAYER_JUMP;
+		// 			}
+		// 		}
+		// 	}
+		// }
         Vector3 movement = Vector3Subtract(camera.position, oldPosition);
         if (freecam) {
             if (IsKeyDown(KEY_Z)) {
@@ -568,7 +594,9 @@ void BR92Engine::HandleInputs(float dt) {
             }
         } else {
             Vector3 adjustedPosition = GlobalMapData->MoveTo(oldPosition, movement, noclip);
-            adjustedPosition = GlobalMapData->ApplyGravity(adjustedPosition, playerMomentumVertical, dt);
+			if (!noclip) {
+				adjustedPosition = GlobalMapData->ApplyGravity(adjustedPosition, playerMomentumVertical, dt);
+			}
             Vector3 delta = Vector3Subtract(adjustedPosition, camera.position);
             camera.position = Vector3Add(camera.position, delta);
             camera.target = Vector3Add(camera.target, delta);
@@ -602,6 +630,7 @@ void BR92Engine::HandleInputs(float dt) {
 
 #pragma region Update
 void BR92Engine::Update(float dt) {
+	deltatime = dt;
 	if (!drawing_menus) {
 		GlobalEntityRenderer->Update(GlobalMapData, camera.position, dt);
 	}

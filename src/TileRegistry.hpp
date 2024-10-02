@@ -68,6 +68,7 @@ class MapTileRegistry : public Registry<MapTile> {
                             tile->isSolid = false;
                             tile->isWall = false;
                             tile->blocksLight = false;
+                            tile->solidFloor = true;
                             if (o["f"].getType() == JSON::Type::String) {
                                 const char* f = o["f"].getCString();
                                 if (GlobalTextureRegistry->has(f)) {
@@ -98,6 +99,7 @@ class MapTileRegistry : public Registry<MapTile> {
                             tile->isSolid = false;
                             tile->isWall = false;
                             tile->blocksLight = false;
+                            tile->solidCeiling = true;
                             if (o["c"].getType() == JSON::Type::String) {
                                 const char* f = o["c"].getCString();
                                 if (GlobalTextureRegistry->has(f)) {
@@ -128,6 +130,7 @@ class MapTileRegistry : public Registry<MapTile> {
                             tile->isWall = true;
                             tile->isSolid = true;
                             tile->blocksLight = true;
+                            tile->solidFloor = tile->solidCeiling = true;
                             if (o["w"].getType() == JSON::Type::String) {
                                 const char* f = o["w"].getCString();
                                 if (GlobalTextureRegistry->has(f)) {

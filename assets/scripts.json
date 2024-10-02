@@ -3,6 +3,10 @@
         {
             "id": "enemy_smoke_cloud_script",
             "script": "scripts/enemy_smoke_cloud_script.txt"
+        },
+        {
+            "id": "enemy_smoke_cloud_script_init",
+            "script": "scripts/enemy_smoke_cloud_script_init.txt"
         }
     ]
 }

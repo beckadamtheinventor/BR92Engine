@@ -12,15 +12,19 @@ static constexpr const char *opcodes[] {
     "push", "pop", "pushb", "popb", "ba", "bz", "bnz", "jsr", "rts", "jsrz", "jsrnz", "rtsz", "rtsnz",
     "eq", "neq", "gt", "lt", "gteq", "lteq", "eqf", "neqf", "gtf", "ltf", "gteqf", "lteqf",
     "bzset32", "bnzset32", "pusharg", "pushvar", "abs", "absf", "sqrt", "sqrtf", "itof", "ftoi",
+    "i64", "u64", "i64b", "u64b",
     nullptr,
 };
 static constexpr const char *opcodes80[] {
     "gettile", "getlight", "tilelight", "tileissolid", "tileisspawnable", "tileiswall",
     "tilefloor", "tileceiling", "tilewall",
+    "camerax", "cameray", "cameraz", "entityx", "entityy", "entityz",
+    "entitymovetowards", "entityrotate", "entityteleport", "canseeplayer",
+    "getentitytimer", "setentitytimer", "randomteleportentity", "getdeltatime",
     nullptr,
 };
 
-static const char *subcstr(const char *data, size_t datalen, size_t start, size_t len) {
+static char *subcstr(const char *data, size_t datalen, size_t start, size_t len) {
     if (start >= datalen) {
         return nullptr;
     }
@@ -87,6 +91,20 @@ size_t ScriptAssemblyCompiler::compile(const char *data, size_t datalen, unsigne
                     outbuf.append(token_int >> 16);
                     outbuf.append(token_int >> 24);
                     break;
+                case Immediate64:
+                case Immediate64B:
+                case Immediate64U:
+                case Immediate64UB:
+                    tk = next(data, datalen, inoffset);
+                    outbuf.append(token_int);
+                    outbuf.append(token_int >>  8);
+                    outbuf.append(token_int >> 16);
+                    outbuf.append(token_int >> 24);
+                    outbuf.append(token_int >> 32);
+                    outbuf.append(token_int >> 40);
+                    outbuf.append(token_int >> 48);
+                    outbuf.append(token_int >> 56);
+                    break;
                 case BA:
                 case BZ:
                 case BNZ:
@@ -143,6 +161,7 @@ size_t ScriptAssemblyCompiler::compile(const char *data, size_t datalen, unsigne
 
     outbuf.append(End);
     *out = outbuf.collapse();
+
     return outbuf.length();
 }
 
@@ -240,38 +259,62 @@ ScriptAssemblyCompiler::Token ScriptAssemblyCompiler::next(const char *data, siz
         //     ;
         }
         tk = Integer;
-    } else if (c == '$' || c == '-' || c >= '0' && c <= '9') {
+    } else if (c == '$' || c == '-' || c == '.' || c >= '0' && c <= '9') {
         // number
-        bool neg = false;
+        bool isfloat = false, neg = false, decimal = false;
         char base = 10;
         long long num = 0;
+        double dec = 0;
+        double place = 0.1f;
         if (c == '-') {
             i++;
             c = peek(data, datalen, i);
             neg = true;
         }
-        if (c == '$') {
+        if (c == '.') {
+            i++;
+            c = peek(data, datalen, i);
+            isfloat = decimal = true;
+        } else if (c == '$') {
             i++;
             base = 16;
         }
-        while (1) {
+        do {
             c = peek(data, datalen, i); i++;
-            if (c >= '0' && c <= '9') {
-                num = num * base + c - '0';
-            } else if (base > 10) {
+            if (c == '.') {
+                isfloat = true;
+                decimal = true;
+                continue;
+            } else if (base == 10 && c == 'f' || c == 'F') {
+                isfloat = true;
+                break;
+            } else if (c >= '0' && c <= '9') {
+                if (decimal) {
+                    dec += (c - '0') * place;
+                    place *= 0.1f;
+                } else {
+                    num = num * base + c - '0';
+                }
+            } else if (base > 10 && !isfloat) {
                 if (c >= 'A' && c <= 'F') {
                     num = num * base + c + 10 - 'A';
                 } else if (c >= 'a' && c <= 'f') {
                     num = num * base + c + 10 - 'a';
+                } else {
+                    break;
                 }
             } else {
                 break;
             }
-        }
+        } while (1);
         if (neg) {
             num = -num;
         }
-        token_int = num;
+        if (isfloat) {
+            token_float = dec + num;
+        } else {
+            token_int = num;
+        }
         tk = Integer;
     } else if (c == '_') {
         // argument/variable
@@ -333,7 +376,10 @@ ScriptAssemblyCompiler::Token ScriptAssemblyCompiler::next(const char *data, siz
             c = peek(data, datalen, i); i++;
         } while (c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_');
         i--;
-        const char *name = subcstr(data, datalen, j, i-j);
+        char *name = subcstr(data, datalen, j, i-j);
+        for (unsigned int i=0; name[i]>0; i++) {
+            name[i] = tolower(name[i]);
+        }
         token_int = -1;
         for (size_t k=0; opcodes[k]!=nullptr; k++) {
             if (!strcmp(name, opcodes[k])) {
@@ -358,5 +404,6 @@ ScriptAssemblyCompiler::Token ScriptAssemblyCompiler::next(const char *data, siz
         printf("Warning: error loading script: Unexpected character '%c' (line %llu)\n", c, lno);
         i++;
     }
+
     return tk;
 }

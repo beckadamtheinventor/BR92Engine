@@ -506,7 +506,7 @@ namespace JSON {
                     o.setBoolean(false);
                     i += 5;
                 } else if (!strncmp(&data[i], "true", 4)) {
-                    o.setBoolean(false);
+                    o.setBoolean(true);
                     i += 4;
                 } else {
                     o.setNull();

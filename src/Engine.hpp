@@ -2,12 +2,8 @@
 
 #include "Configs.hpp"
 #include "Entity.hpp"
-#include "MapData.hpp"
-#include "Registries.hpp"
 #include "imgui.h"
 #include "raylib.h"
-#include "ScriptEngine/ScriptBytecode.hpp"
-#include "ScriptEngine/ScriptAssemblyCompiler.hpp"
 
 #define PLAYER_SPEED 1.5f
 
@@ -25,6 +21,7 @@ class BR92Engine {
     Camera3D camera;
     ImVec2 gameWindowPosition;
     Vector3 dev_lightPosition;
+    float deltatime;
     float dev_lightValue;
     float dev_lightColor[3];
     float mouseSensitivity, playerSpeed, playerMomentumVertical;
@@ -64,3 +61,5 @@ class BR92Engine {
     void TakeScreenshot(Texture2D texture);
     void ResizeWindow();
 };
+
+extern BR92Engine* GlobalEngine;

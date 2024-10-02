@@ -7,12 +7,18 @@
                 "entitySmoggFrame1",
                 "entitySmoggFrame2",
                 "entitySmoggFrame3",
+                "entitySmoggFrame2",
+                "entitySmoggFrame3",
                 "entitySmoggFrame2"
             ],
-            "frametime": 1.2857,
+            "frametime": 0.8571,
+            "scale": 1.8,
             "canmove": true,
             "facesplayer": true,
-            "script": "enemy_smoke_cloud_script"
+            "script": {
+                "init": "enemy_smoke_cloud_script_init",
+                "update": "enemy_smoke_cloud_script"
+            }
         }
     ]
 }

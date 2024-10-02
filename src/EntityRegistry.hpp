@@ -3,7 +3,6 @@
 #include "Helpers.hpp"
 #include "Json.hpp"
 #include "Registry.hpp"
-#include "ScriptEngine/ScriptAssemblyCompiler.hpp"
 #include "TextureRegistry.hpp"
 #include "ScriptRegistry.hpp"
 #include <fstream>
@@ -13,6 +12,7 @@ class EntityType {
     char* name=nullptr;
     unsigned short id;
     unsigned short script=0;
+    unsigned short script_init=0;
     unsigned char nframes=1;
     union {
         unsigned char flags=0;
@@ -22,6 +22,7 @@ class EntityType {
         };
     };
     float frametime=0.0f;
+    float scale=1.0f;
     unsigned short textures[16] = {0};
 };
 
@@ -29,6 +30,7 @@ class EntityRegistry : public Registry<EntityType> {
     public:
     bool load(const char* fname, TextureRegistry* GlobalTextureRegistry) {
         fname = AssetPath::clone(fname);
+        this->add("none");
         char* datastr;
         std::ifstream fd(fname);
 
@@ -109,6 +111,15 @@ class EntityRegistry : public Registry<EntityType> {
                                 }
                             }
                         }
+                        if (o.has("scale")) {
+                            if (o["scale"].getType() == JSON::Type::Float) {
+                                ent->scale = o["scale"].getFloat();
+                            } else if (o["scale"].getType() == JSON::Type::Integer) {
+                                ent->scale = o["scale"].getInteger();
+                            } else {
+                                JsonFormatError(fname, "Elements array member contains invalid value (should be float/int) for field", "scale");
+                            }
+                        }
                         if (o.has("canmove")) {
                             if (o["canmove"].getType() == JSON::Type::Boolean) {
                                 ent->canmove = o["canmove"].getBoolean();
@@ -124,7 +135,43 @@ class EntityRegistry : public Registry<EntityType> {
                             }
                         }
                         if (o.has("script")) {
-                            if (o["script"].getType() == JSON::Type::String) {
+                            if (o["script"].getType() == JSON::Type::Object) {
+                                JSON::JSONObject& oo = o["script"].getObject();
+                                if (oo.has("init")) {
+                                    if (oo["init"].getType() == JSON::Type::String) {
+                                        Script* script = GlobalScriptRegistry->of(oo["init"].getCString());
+                                        if (script == nullptr) {
+                                            JsonFormatError(fname, "Elements array member references non-existant script id", oo["init"].getCString());
+                                        }
+                                        ent->script_init = script->id;
+                                    } else if (oo["init"].getType() == JSON::Type::Integer) {
+                                        Script* script = GlobalScriptRegistry->of(oo["init"].getInteger());
+                                        if (script == nullptr) {
+                                            JsonFormatError(fname, "Elements array member references non-existant script id", oo["init"].getInteger());
+                                        }
+                                        ent->script_init = script->id;
+                                    } else {
+                                        JsonFormatError(fname, "Elements array member contains invalid valid (should be string/int) for field", "script>init");
+                                    }
+                                }
+                                if (oo.has("update")) {
+                                    if (oo["update"].getType() == JSON::Type::String) {
+                                        Script* script = GlobalScriptRegistry->of(oo["update"].getCString());
+                                        if (script == nullptr) {
+                                            JsonFormatError(fname, "Elements array member references non-existant script id", oo["update"].getCString());
+                                        }
+                                        ent->script = script->id;
+                                    } else if (oo["update"].getType() == JSON::Type::Integer) {
+                                        Script* script = GlobalScriptRegistry->of(oo["update"].getInteger());
+                                        if (script == nullptr) {
+                                            JsonFormatError(fname, "Elements array member references non-existant script id", oo["update"].getInteger());
+                                        }
+                                        ent->script = script->id;
+                                    } else {
+                                        JsonFormatError(fname, "Elements array member contains invalid valid (should be string/int) for field", "script>update");
+                                    }
+                                }
+                            } else if (o["script"].getType() == JSON::Type::String) {
                                 Script* script = GlobalScriptRegistry->of(o["script"].getCString());
                                 if (script == nullptr) {
                                     JsonFormatError(fname, "Elements array member references non-existant script id", o["script"].getCString());
@@ -151,3 +198,5 @@ class EntityRegistry : public Registry<EntityType> {
         return true;
     }
 };
+
+extern EntityRegistry* GlobalEntityRegistry;

@@ -128,6 +128,18 @@ class RWBuffer {
         }
         return amount;
     }
+    inline size_t skip(size_t amount) {
+        if (_data == nullptr) {
+            return 0;
+        }
+        if (_offset + amount >= _len) {
+            size_t v = _len - _offset + amount;
+            _offset = _len;
+            return v;
+        }
+        _offset += amount;
+        return amount;
+    }
     template<class V>
     inline bool readV(V* val) {
         if (available() < sizeof(V)) {

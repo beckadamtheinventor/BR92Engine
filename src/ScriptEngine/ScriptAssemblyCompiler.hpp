@@ -16,7 +16,10 @@ class ScriptAssemblyCompiler {
     DynamicArray<labelusage_t, 128> labelusages;
     DynamicArray<unsigned char, 512> outbuf;
 
-    long long token_int;
+    union {
+        long long token_int;
+        double token_float;
+    };
     char *token_str;
     size_t lno;
     
@@ -31,9 +34,13 @@ class ScriptAssemblyCompiler {
         Push, Pop, PushB, PopB, BA, BZ, BNZ, JSR, RTS, JSRZ, JSRNZ, RTSZ, RTSNZ,
         EQ, NEQ, GT, LT, GTEQ, LTEQ, EQF, NEQF, GTF, LTF, GTEQF, LTEQF,
         BZSet32, BNZSet32, PushArg, PushVar, Abs, AbsF, Sqrt, SqrtF, Itof, Ftoi,
+        Immediate64, Immediate64U, Immediate64B, Immediate64UB,
 
         GetTileId=0x80, GetLightLevel, TileLightLevel, TileIsSolid, TileIsSpawnable, TileIsWall,
         TileFloor, TileCeiling, TileWall,
+        CameraX, CameraY, CameraZ, EntityX, EntityY, EntityZ,
+        EntityMoveTowards, EntityRotate, EntityTeleport, CanSeePlayer,
+        GetEntityTimer, SetEntityTimer, RandomTeleportEntity, GetDeltaTime,
 
         None=0xF8, Integer, Label, LabelUsage,
     };

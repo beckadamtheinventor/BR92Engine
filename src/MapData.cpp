@@ -1,6 +1,7 @@
 
 #include "MapData.hpp"
 #include "AssetPath.hpp"
+#include "Engine.hpp"
 #include "ShaderLoader.hpp"
 #include "TileRegistry.hpp"
 #include "raylib.h"
@@ -110,6 +111,10 @@ bool MapData::LoadMapChunk(RBuffer& data) {
     if (!data.readV<unsigned int>(&magic)) {
         return false;
     }
+    unsigned int size;
+    if (!data.readV<unsigned int>(&size)) {
+        return false;
+    }
     if (magic == WALL_MAP_MAGIC_NUMBER) {
         if (!LoadMapWalls(data)) {
             return false;
@@ -141,6 +146,28 @@ bool MapData::LoadMapChunk(RBuffer& data) {
         if (!data.readV<float>(&lightLevel)) {
             return false;
         }
+    } else if (magic == ENTITY_MAGIC_NUMBER) {
+        unsigned short type;
+        Vector3 pos;
+        float rot;
+        if (!data.readV<unsigned short>(&type)) {
+            return false;
+        }
+        if (!data.readV<float>(&pos.x)) {
+            return false;
+        }
+        if (!data.readV<float>(&pos.y)) {
+            return false;
+        }
+        if (!data.readV<float>(&pos.z)) {
+            return false;
+        }
+        if (!data.readV<float>(&rot)) {
+            return false;
+        }
+        GlobalEntityRenderer->Add(type, pos, rot);
+    } else {
+        data.skip(size);
     }
     return true;
 }
@@ -189,15 +216,9 @@ bool MapData::LoadMapTiles(RBuffer& data) {
     for (unsigned char zz=0; zz<sizeZ; zz++) {
         for (unsigned char xx=0; xx<sizeX; xx++) {
             unsigned short tid;
-            unsigned char c;
-            if (!data.read(c)) {
+            if (!data.readV<unsigned short>(&tid)) {
                 return false;
             }
-            tid = c;
-            if (!data.read(c)) {
-                return false;
-            }
-            tid |= c << 8;
             map[{xx, zz}] = tid;
             MapTile* tile = tileRegistry->of(tid);
             if (tile != nullptr) {
@@ -835,7 +856,7 @@ Vector3 MapData::MoveTo(Vector3 position, Vector3 move, bool noclip) {
 }
 
 Vector3 MapData::ApplyGravity(Vector3 position, float& momentum, float dt) {
-    if (momentum >= 0) {
+    if (momentum > 0) {
         position.y += momentum*dt + PLAYER_WIDTH;
         unsigned short tid = get(position);
         MapTile* tile = tileRegistry->of(tid);
@@ -843,17 +864,24 @@ Vector3 MapData::ApplyGravity(Vector3 position, float& momentum, float dt) {
             position.y = ceilf(position.y);
         }
         position.y -= PLAYER_WIDTH;
+        momentum += GRAVITY * dt * 0.5f;
+        if (momentum < -MAX_FALL_SPEED) {
+            momentum = -MAX_FALL_SPEED;
+        }
     } else {
-        position.y += momentum*dt - PLAYER_HEIGHT;
+        position.y += momentum*dt + 0.5f - PLAYER_HEIGHT;
         unsigned short tid = get(position);
         MapTile* tile = tileRegistry->of(tid);
         if (tile == nullptr || !tile->solidFloor) {
-            momentum += GRAVITY * dt;
+            momentum += GRAVITY * dt * 0.5f;
+            if (momentum < -MAX_FALL_SPEED) {
+                momentum = -MAX_FALL_SPEED;
+            }
         } else {
-            position.y = floorf(position.y);
+            position.y = floorf(position.y) + 0.5f;
             momentum = 0;
         }
-        position.y += PLAYER_HEIGHT;
+        position.y += PLAYER_HEIGHT - 0.5f;
     }
     return position;
 }

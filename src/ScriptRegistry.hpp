@@ -28,9 +28,8 @@ class Script {
         std::ifstream fd(fname);
         if (fd.is_open()) {
             size_t count = fstreamlen(fd);
-            char* datastr = new char[count+1];
+            char* datastr = new char[count];
             fd.read(datastr, count);
-            datastr[count] = 0;
             fd.close();
             ScriptAssemblyCompiler compiler;
             unsigned char* binary;
@@ -47,6 +46,7 @@ class ScriptRegistry : public Registry<Script> {
     public:
     bool load(const char* fname, ScriptInterface* interface) {
         fname = AssetPath::clone(fname);
+        this->add("none");
         char* datastr;
         std::ifstream fd(fname);
         if (fd.is_open()) {
@@ -72,7 +72,7 @@ class ScriptRegistry : public Registry<Script> {
                         Script* script = this->add(id);
                         if (o.has("script")) {
                             if (o["script"].getType() == JSON::Type::String) {
-                                script->load(AssetPath::root(o["script"].getCString()));
+                                script->load(AssetPath::root(o["script"].getCString(), nullptr));
                             } else {
                                 JsonFormatError(fname, "Elements array member script component should be string (file name)");
                                 return false;
