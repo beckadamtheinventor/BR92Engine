@@ -1,0 +1,5 @@
+-std=c++20
+-Iinclude
+-Ithirdparty/raylib-5.0/src
+-Ithirdparty/imgui-docking/imgui
+-Ithirdparty/rlImGui/src

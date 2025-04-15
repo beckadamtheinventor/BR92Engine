@@ -91,10 +91,10 @@ float ScriptInterface::cameraZ() {
 }
 
 float ScriptInterface::entityX(unsigned int id) {
-    if (id >= GlobalEntityRenderer->length()) {
+    if (id >= GlobalEntityRenderer->size()) {
         return 0;
     }
-    Entity* ent = GlobalEntityRenderer->get(id);
+    Entity* ent = GlobalEntityRenderer->at(id);
     if (ent == nullptr) {
         return 0;
     }
@@ -102,10 +102,10 @@ float ScriptInterface::entityX(unsigned int id) {
 }
 
 float ScriptInterface::entityY(unsigned int id) {
-    if (id >= GlobalEntityRenderer->length()) {
+    if (id >= GlobalEntityRenderer->size()) {
         return 0;
     }
-    Entity* ent = GlobalEntityRenderer->get(id);
+    Entity* ent = GlobalEntityRenderer->at(id);
     if (ent == nullptr) {
         return 0;
     }
@@ -113,10 +113,10 @@ float ScriptInterface::entityY(unsigned int id) {
 }
 
 float ScriptInterface::entityZ(unsigned int id) {
-    if (id >= GlobalEntityRenderer->length()) {
+    if (id >= GlobalEntityRenderer->size()) {
         return 0;
     }
-    Entity* ent = GlobalEntityRenderer->get(id);
+    Entity* ent = GlobalEntityRenderer->at(id);
     if (ent == nullptr) {
         return 0;
     }
@@ -124,10 +124,10 @@ float ScriptInterface::entityZ(unsigned int id) {
 }
 
 void ScriptInterface::entityMoveTowards(unsigned int id, float x, float y, float z, float speed) {
-    if (id >= GlobalEntityRenderer->length()) {
+    if (id >= GlobalEntityRenderer->size()) {
         return;
     }
-    Entity* ent = GlobalEntityRenderer->get(id);
+    Entity* ent = GlobalEntityRenderer->at(id);
     if (ent == nullptr) {
         return;
     }
@@ -137,20 +137,20 @@ void ScriptInterface::entityMoveTowards(unsigned int id, float x, float y, float
 }
 
 void ScriptInterface::entityRotate(unsigned int id, float r) {
-    if (id >= GlobalEntityRenderer->length()) {
+    if (id >= GlobalEntityRenderer->size()) {
         return;
     }
-    Entity* ent = GlobalEntityRenderer->get(id);
+    Entity* ent = GlobalEntityRenderer->at(id);
     if (ent == nullptr) {
         return;
     }
     ent->Rotate(r, true);
 }
 void ScriptInterface::entityTeleport(unsigned int id, float x, float y, float z) {
-    if (id >= GlobalEntityRenderer->length()) {
+    if (id >= GlobalEntityRenderer->size()) {
         return;
     }
-    Entity* ent = GlobalEntityRenderer->get(id);
+    Entity* ent = GlobalEntityRenderer->at(id);
     if (ent == nullptr) {
         return;
     }
@@ -158,10 +158,10 @@ void ScriptInterface::entityTeleport(unsigned int id, float x, float y, float z)
 }
 
 bool ScriptInterface::canSeePlayer(unsigned int id) {
-    if (id >= GlobalEntityRenderer->length()) {
+    if (id >= GlobalEntityRenderer->size()) {
         return 0;
     }
-    Entity* ent = GlobalEntityRenderer->get(id);
+    Entity* ent = GlobalEntityRenderer->at(id);
     if (ent == nullptr) {
         return false;
     }
@@ -173,10 +173,10 @@ bool ScriptInterface::canSeePlayer(unsigned int id) {
 }
 
 float ScriptInterface::getEntityTimer(unsigned int id) {
-    if (id >= GlobalEntityRenderer->length()) {
+    if (id >= GlobalEntityRenderer->size()) {
         return 0;
     }
-    Entity* ent = GlobalEntityRenderer->get(id);
+    Entity* ent = GlobalEntityRenderer->at(id);
     if (ent == nullptr) {
         return 0;
     }
@@ -184,20 +184,20 @@ float ScriptInterface::getEntityTimer(unsigned int id) {
 }
 
 void ScriptInterface::setEntityTimer(unsigned int id, float v) {
-    if (id >= GlobalEntityRenderer->length()) {
+    if (id >= GlobalEntityRenderer->size()) {
         return;
     }
-    Entity* ent = GlobalEntityRenderer->get(id);
+    Entity* ent = GlobalEntityRenderer->at(id);
     if (ent != nullptr) {
         ent->timer = v;
     }
 }
 
 void ScriptInterface::randomTeleportEntity(unsigned int id, float min_dist, float max_dist, bool avoid_player) {
-    if (id >= GlobalEntityRenderer->length()) {
+    if (id >= GlobalEntityRenderer->size()) {
         return;
     }
-    Entity* ent = GlobalEntityRenderer->get(id);
+    Entity* ent = GlobalEntityRenderer->at(id);
     if (ent == nullptr) {
         return;
     }
@@ -205,7 +205,7 @@ void ScriptInterface::randomTeleportEntity(unsigned int id, float min_dist, floa
     float dist;
     bool can_see_player = false;
     do {
-        unsigned int i = rand() % GlobalMapData->spawnableSpaces.length();
+        unsigned int i = rand() % GlobalMapData->spawnableSpaces.size();
         ent->Move(GlobalMapData->spawnableSpaces[i], true);
         dist = Vector3Distance(ent->pos, GlobalEngine->camera.position);
         if (avoid_player) {

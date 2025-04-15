@@ -9,7 +9,6 @@
 #include "rlgl.h"
 #include "raymath.h"
 #include <cmath>
-#include <ios>
 
 #define OpenGLDebug(s) if (GLenum e = glGetError()) printf("%s: OpenGL Error: %u\n", s, e)
 
@@ -58,7 +57,7 @@ class Entity {
     }
 };
 
-class EntityRenderer : public DynamicArray<Entity*> {
+class EntityRenderer : public std::vector<Entity*> {
     unsigned int vao, vbo;
     static const constexpr char cubeverts[12] = {
         1, 0, 0,
@@ -92,13 +91,13 @@ class EntityRenderer : public DynamicArray<Entity*> {
     }
     Entity* Add(unsigned short type, Vector3 pos, float rot=0) {
         Entity* ent = new Entity(type, pos, rot);
-        append(ent);
+        push_back(ent);
         return ent;
     }
 
     void Init() {
-        for (size_t i=0; i<length(); i++) {
-            Entity* ent = get(i);
+        for (size_t i=0; i<size(); i++) {
+            Entity* ent = at(i);
             if (ent == nullptr) {
                 continue;
             }
@@ -120,8 +119,8 @@ class EntityRenderer : public DynamicArray<Entity*> {
     }
 
     void Update(MapData* map, Vector3 camera, float dt) {
-        for (size_t i=0; i<length(); i++) {
-            Entity* ent = get(i);
+        for (size_t i=0; i<size(); i++) {
+            Entity* ent = at(i);
             if (ent == nullptr || ent->type == 0) {
                 continue;
             }
@@ -159,7 +158,26 @@ class EntityRenderer : public DynamicArray<Entity*> {
         }
     }
 
-    void Draw(MapData* map, Vector3 camera, float renderwidth) {
+    void Draw(MapData* map, Vector3 camera, float renderwidth, bool vr_mode=false) {
+        if (vr_mode) {
+            Matrix matModelView = rlGetMatrixModelview();
+            // Matrix matProjection = rlGetMatrixProjection();
+            for (int e=0; e<2; e++) {
+                rlViewport(e*rlGetFramebufferWidth()/2, 0, rlGetFramebufferWidth()/2, rlGetFramebufferHeight());
+                Matrix matModelViewProjection = MatrixMultiply(MatrixMultiply(matModelView, rlGetMatrixViewOffsetStereo(e)), rlGetMatrixProjectionStereo(e));
+                // rlSetMatrixModelview(MatrixMultiply(matModelView, rlGetMatrixViewOffsetStereo(e)));
+                // rlSetMatrixProjection(rlGetMatrixProjectionStereo(e));
+                _Draw(map, camera, &matModelViewProjection, renderwidth/2);
+            }
+            rlViewport(0, 0, rlGetFramebufferWidth(), rlGetFramebufferHeight());
+            // rlSetMatrixModelview(matModelView);
+            // rlSetMatrixProjection(matProjection);
+        } else {
+            _Draw(map, camera, nullptr, renderwidth);
+        }
+    }
+
+    void _Draw(MapData* map, Vector3 camera, Matrix* mat, float renderwidth) {
         Shader shader = map->spriteShader;
         glUseProgram(shader.id);
         unsigned int loc = GetShaderLocation(shader, "renderwidth");
@@ -171,12 +189,14 @@ class EntityRenderer : public DynamicArray<Entity*> {
         glActiveTexture(GL_TEXTURE0);
         glEnable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE);
-        Matrix matView = rlGetMatrixModelview();
-        Matrix matProjection = rlGetMatrixProjection();
-        Matrix matModel = rlGetMatrixTransform();
-        Matrix matModelView = MatrixMultiply(matModel, matView);
-        Matrix matModelViewProjection = MatrixMultiply(matModelView, matProjection);
-        rlSetUniformMatrix(shader.locs[SHADER_LOC_MATRIX_MVP], matModelViewProjection);
+        if (mat == nullptr) {
+            Matrix matProjection = rlGetMatrixProjection();
+            Matrix matModelView = rlGetMatrixModelview();
+            Matrix matModelViewProjection = MatrixMultiply(matModelView, matProjection);
+            rlSetUniformMatrix(shader.locs[SHADER_LOC_MATRIX_MVP], matModelViewProjection);
+        } else {
+            rlSetUniformMatrix(shader.locs[SHADER_LOC_MATRIX_MVP], *mat);
+        }
         loc = GetShaderLocation(shader, "renderwidth");
         glUniform1f(loc, renderwidth);
         loc = GetShaderLocation(shader, "FogMin");
@@ -191,8 +211,8 @@ class EntityRenderer : public DynamicArray<Entity*> {
         unsigned int t1loc = GetShaderLocation(shader, "texture1");
         unsigned int modelloc = GetShaderLocation(shader, "model");
         unsigned int scaleloc = GetShaderLocation(shader, "scale");
-        for (size_t i=0; i<length(); i++) {
-            Entity* ent = get(i);
+        for (size_t i=0; i<size(); i++) {
+            Entity* ent = at(i);
             if (Vector3Distance(ent->pos, camera) < map->renderDistance) {
                 LightMap* lmap = map->getLightMap(ent->pos);
                 if (lmap != nullptr) {
@@ -205,7 +225,6 @@ class EntityRenderer : public DynamicArray<Entity*> {
                 glUniform1f(scaleloc, ent->scale);
                 glBindVertexArray(vao);
                 glDrawArrays(GL_TRIANGLES, 0, 2*3);
-                OpenGLDebug("hmmm");
             }
         }
         glBindVertexArray(0);

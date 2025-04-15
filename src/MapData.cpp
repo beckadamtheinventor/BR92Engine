@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cmath>
 #include <thread>
+#include <vector>
 
 MapData* GlobalMapData=nullptr;
 
@@ -223,19 +224,19 @@ bool MapData::LoadMapTiles(RBuffer& data) {
             MapTile* tile = tileRegistry->of(tid);
             if (tile != nullptr) {
                 if (tile->light > 0) {
-                    lightList.append({x+xx, y, z+zz, tile->light, tile->tintr, tile->tintg, tile->tintb});
+                    lightList.push_back({x+xx, y, z+zz, tile->light, tile->tintr, tile->tintg, tile->tintb});
                 }
                 if (tile->isSpawnable) {
-                    spawnableSpaces.append({(float)x+xx, (float)y, (float)z+zz});
+                    spawnableSpaces.push_back({(float)x+xx, (float)y, (float)z+zz});
                 }
             }
         }
     }
-    maps.append(map);
-    positions.append({x, y, z});
-    lightmaps.append(new LightMap(sizeX, sizeZ));
-    MapIntMeshes.append(new MapIntMesh());
-    TraceLog(LOG_INFO, "Loaded map #%llu at %d,%d,%d size %d,%d", maps.length(), x, y, z, sizeX, sizeZ);
+    maps.push_back(map);
+    positions.push_back({x, y, z});
+    lightmaps.push_back(new LightMap(sizeX, sizeZ));
+    MapIntMeshes.push_back(new MapIntMesh());
+    TraceLog(LOG_INFO, "Loaded map #%llu at %d,%d,%d size %d,%d", maps.size(), x, y, z, sizeX, sizeZ);
     return true;
 }
 #pragma endregion
@@ -251,12 +252,12 @@ bool MapData::LoadLightMap(RBuffer& data) {
     }
     LightMap* map = nullptr;
     char sizeX, sizeZ;
-    if (i < lightmaps.length()) {
+    if (i < lightmaps.size()) {
         map = lightmaps[i];
         sizeX = map->width();
         sizeZ = map->height();
     } else {
-        if (i < maps.length()) {
+        if (i < maps.size()) {
             sizeX = maps[i].width();
             sizeZ = maps[i].height();
         } else {
@@ -297,10 +298,10 @@ void MapData::SaveMap(const char* fname) {
 }
 
 void MapData::SaveMap(std::ostream& fd) {
-    for (size_t i=0; i<maps.length(); i++) {
+    for (size_t i=0; i<maps.size(); i++) {
         SaveMapTile(fd, &maps[i], positions[i]);
     }
-    for (size_t i=0; i<maps.length(); i++) {
+    for (size_t i=0; i<maps.size(); i++) {
         SaveLightMap(fd, i);
     }
 }
@@ -399,13 +400,13 @@ bool isSolidToLight(MapTileRegistry* reg, unsigned short tid) {
 }
 
 void MapData::BuildLighting() {
-    TraceLog(LOG_INFO, "Building lighting for %llu lights...", lightList.length());
-    for (size_t i=0; i<maps.length(); i++) {
+    TraceLog(LOG_INFO, "Building lighting for %llu lights...", lightList.size());
+    for (size_t i=0; i<maps.size(); i++) {
         TileArray* map = &maps[i];
         int y = positions[i].y;
         int xx = positions[i].x;
         int zz = positions[i].z;
-        for (size_t j=0; j<lightList.length(); j++) {
+        for (size_t j=0; j<lightList.size(); j++) {
             PlacedLight* light = &lightList[j];
             TraceLog(LOG_INFO, "Building light %llu", j);
             // float dy = powf(y - light->y, 2);
@@ -442,7 +443,7 @@ Vector3 MapData::RayCast(Vector3 pos, Vector3 dir, HitInfo& hit, size_t max_step
 #pragma endregion
 
 #pragma region _GenerateMesh()
-static void _GenerateMesh(TileArray* map, LightMap* lmap, MapTileRegistry* tileRegistry, DynamicArray<unsigned int>* verts, DynamicArray<unsigned short>* indices) {
+static void _GenerateMesh(TileArray* map, LightMap* lmap, MapTileRegistry* tileRegistry, std::vector<unsigned int>* verts, std::vector<unsigned short>* indices) {
     unsigned int mi = 0;
     for (int z=0; z<map->height(); z++) {
         for (int x=0; x<map->width(); x++) {
@@ -479,7 +480,7 @@ static void _GenerateMesh(TileArray* map, LightMap* lmap, MapTileRegistry* tileR
                     for (char j=0; j<4; j++) {
                         // TraceLog(LOG_INFO, "vertex %d, %d, %d [%u]",
                         //     cubeverts[fo + j*3 + 0] + x, cubeverts[fo + j*3 + 1], cubeverts[fo + j*3 + 2] + z, tid);
-                        verts->append(
+                        verts->push_back(
                             (vertexnumbers[j] << 30) | // Vertex number
                             (cubeverts[fo + j*3 + 1]<<29) | // Y position
                             ((cubeverts[fo + j*3 + 0] + x)<<20) | // X position
@@ -489,7 +490,7 @@ static void _GenerateMesh(TileArray* map, LightMap* lmap, MapTileRegistry* tileR
                     }
                     for (char j=0; j<6; j++) {
                         // TraceLog(LOG_INFO, "index %d", mi+I[j]);
-                        indices->append(mi+triangleindices[j]);
+                        indices->push_back(mi+triangleindices[j]);
                     }
                     mi += 4;
                 }
@@ -517,34 +518,34 @@ void MapData::SetLevelMesh(size_t i, unsigned int vertCount, unsigned int* verts
 }
 
 void MapData::GenerateMesh(size_t i) {
-    DynamicArray<unsigned int>* vertarray = new DynamicArray<unsigned int>(maps[i].size()*6*4*2);
-    DynamicArray<unsigned short>* indexarray = new DynamicArray<unsigned short>(maps[i].size()*36);
+    std::vector<unsigned int>* vertarray = new std::vector<unsigned int>(maps[i].size()*6*4*2);
+    std::vector<unsigned short>* indexarray = new std::vector<unsigned short>(maps[i].size()*36);
     _GenerateMesh(&maps[i], lightmaps[i], tileRegistry, vertarray, indexarray);
     SetLevelMesh(i,
-        vertarray->length()/2, vertarray->collapse(),
-        indexarray->length()/3, indexarray->collapse()
+        vertarray->size()/2, vertarray->data(),
+        indexarray->size()/3, indexarray->data()
     );
     delete vertarray;
     delete indexarray;
 }
 
 void MapData::GenerateMesh() {
-    std::thread threads[maps.length()];
-    DynamicArray<unsigned int>* vertarrays[maps.length()];
-    DynamicArray<unsigned short>* indexarrays[maps.length()];
-    for (size_t i=0; i<maps.length(); i++) {
-        vertarrays[i] = new DynamicArray<unsigned int>();
-        indexarrays[i] = new DynamicArray<unsigned short>();
+    std::thread threads[maps.size()];
+    std::vector<unsigned int>* vertarrays[maps.size()];
+    std::vector<unsigned short>* indexarrays[maps.size()];
+    for (size_t i=0; i<maps.size(); i++) {
+        vertarrays[i] = new std::vector<unsigned int>();
+        indexarrays[i] = new std::vector<unsigned short>();
         vertarrays[i]->resize(maps[i].size()*6*4*2);
         indexarrays[i]->resize(maps[i].size()*36);
         threads[i] = std::thread(_GenerateMesh, &maps[i], lightmaps[i], tileRegistry, vertarrays[i], indexarrays[i]);
     }
-    for (size_t i=0; i<maps.length(); i++) {
+    for (size_t i=0; i<maps.size(); i++) {
         if (threads[i].joinable()) {
             threads[i].join();
             SetLevelMesh(i,
-                vertarrays[i]->length(), vertarrays[i]->collapse(),
-                indexarrays[i]->length()/3, indexarrays[i]->collapse()
+                vertarrays[i]->size(), vertarrays[i]->data(),
+                indexarrays[i]->size()/3, indexarrays[i]->data()
             );
             delete vertarrays[i];
             delete indexarrays[i];
@@ -577,7 +578,7 @@ void MapData::UploadMap(size_t mapno) {
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 }
 void MapData::UploadMap() {
-    for (size_t i=0; i<MapIntMeshes.length(); i++) {
+    for (size_t i=0; i<MapIntMeshes.size(); i++) {
         UploadMap(i);
     }
 }
@@ -585,7 +586,7 @@ void MapData::UploadMap() {
 
 #pragma region ClearMap
 void MapData::ClearMap() {
-    for (size_t i=0; i<MapIntMeshes.length(); i++) {
+    for (size_t i=0; i<MapIntMeshes.size(); i++) {
         MapIntMesh* mesh = MapIntMeshes[i];
         delete mesh->indices;
         delete mesh->verts;
@@ -595,10 +596,10 @@ void MapData::ClearMap() {
         glDeleteBuffers(2, mesh->vbo);
         delete mesh;
     }
-    for (size_t i=0; i<lightmaps.length(); i++) {
+    for (size_t i=0; i<lightmaps.size(); i++) {
         delete lightmaps[i];
     }
-    for (size_t i=0; i<maps.length(); i++) {
+    for (size_t i=0; i<maps.size(); i++) {
         maps[i].resize(0, 0);
     }
     MapIntMeshes.clear();
@@ -627,7 +628,7 @@ unsigned short MapData::get(Vector3 pos) {
     return get(floorf(pos.x), floorf(pos.y), floorf(pos.z));
 }
 unsigned short MapData::get(int x, int y, int z) {
-    for (size_t i=0; i<maps.length(); i++) {
+    for (size_t i=0; i<maps.size(); i++) {
         Vec3I p = positions[i];
         if (x >= p.x && y == p.y && z >= p.z) {
             TileArray& map = maps[i];
@@ -688,7 +689,7 @@ Color* MapData::getLight(Vector3 pos) {
     return getLight(pos.x, pos.y, pos.z);
 }
 Color* MapData::getLight(int x, int y, int z) {
-    for (size_t i=0; i<lightmaps.length(); i++) {
+    for (size_t i=0; i<lightmaps.size(); i++) {
         Vec3I p = positions[i];
         if (x >= p.x && y == p.y && z >= p.z) {
             LightMap* map = lightmaps[i];
@@ -714,7 +715,7 @@ size_t MapData::findLight(Vector3 pos) {
 }
 
 size_t MapData::findLight(int x, int y, int z) {
-    for (size_t i=0; i<lightmaps.length(); i++) {
+    for (size_t i=0; i<lightmaps.size(); i++) {
         Vec3I p = positions[i];
         if (x >= p.x && y == p.y && z >= p.z) {
             LightMap* map = lightmaps[i];
@@ -762,7 +763,26 @@ bool MapData::ShouldRenderMap(Vector3 pos, size_t mapno) {
 
 
 #pragma region Draw()
-void MapData::Draw(Vector3 camerapos, Matrix* mat, float renderwidth) {
+void MapData::Draw(Vector3 camera, Matrix* mat, float renderwidth, bool vr_mode) {
+    if (vr_mode) {
+        Matrix matModelView = rlGetMatrixModelview();
+        // Matrix matProjection = rlGetMatrixProjection();
+        for (int e=0; e<2; e++) {
+            rlViewport(e*rlGetFramebufferWidth()/2, 0, rlGetFramebufferWidth()/2, rlGetFramebufferHeight());
+            Matrix matModelViewProjection = MatrixMultiply(MatrixMultiply(matModelView, rlGetMatrixViewOffsetStereo(e)), rlGetMatrixProjectionStereo(e));
+            // rlSetMatrixModelview(MatrixMultiply(matModelView, rlGetMatrixViewOffsetStereo(e)));
+            // rlSetMatrixProjection(rlGetMatrixProjectionStereo(e));
+            _Draw(camera, &matModelViewProjection, renderwidth/2);
+        }
+        rlViewport(0, 0, rlGetFramebufferWidth(), rlGetFramebufferHeight());
+        // rlSetMatrixModelview(matModelView);
+        // rlSetMatrixProjection(matProjection);
+    } else {
+        _Draw(camera, mat, renderwidth);
+    }
+}
+
+void MapData::_Draw(Vector3 camerapos, Matrix* mat, float renderwidth) {
     unsigned int loc;
     glUseProgram(mainShader.id);
     glActiveTexture(GL_TEXTURE0);
@@ -774,10 +794,8 @@ void MapData::Draw(Vector3 camerapos, Matrix* mat, float renderwidth) {
     // loc = GetShaderLocation(mainShader, "cameraPosition");
     // glUniform3f(loc, camerapos.x, camerapos.y, camerapos.z);
     if (mat==nullptr) {
-        Matrix matView = rlGetMatrixModelview();
         Matrix matProjection = rlGetMatrixProjection();
-        Matrix matModel = rlGetMatrixTransform();
-        Matrix matModelView = MatrixMultiply(matModel, matView);
+        Matrix matModelView = rlGetMatrixModelview();
         Matrix matModelViewProjection = MatrixMultiply(matModelView, matProjection);
         rlSetUniformMatrix(mainShader.locs[SHADER_LOC_MATRIX_MVP], matModelViewProjection);
     } else {
@@ -795,7 +813,7 @@ void MapData::Draw(Vector3 camerapos, Matrix* mat, float renderwidth) {
     glUniform1f(loc, lightLevel);
     loc = GetShaderLocation(mainShader, "drawPosition");
     unsigned int lmaploc = GetShaderLocation(mainShader, "texture1");
-    for (size_t i=0; i<MapIntMeshes.length(); i++) {
+    for (size_t i=0; i<MapIntMeshes.size(); i++) {
         if (ShouldRenderMap(camerapos, i)) {
             MapIntMesh* imesh = MapIntMeshes[i];
             Vec3I pos = positions[i];

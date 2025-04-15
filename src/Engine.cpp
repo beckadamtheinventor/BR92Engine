@@ -26,6 +26,7 @@ BR92Engine* GlobalEngine=nullptr;
 
 #pragma region Init
 void BR92Engine::Init() {
+	TraceLog(LOG_INFO, "Initializing Registries...");
     GlobalMapTileRegistry = new MapTileRegistry();
     GlobalTextureRegistry = new TextureRegistry();
 	GlobalEntityRegistry = new EntityRegistry();
@@ -39,27 +40,32 @@ void BR92Engine::Init() {
 
 #pragma region LoadRegistries
 bool BR92Engine::LoadRegistries(char* textures, char* tiles, char* entities, char* scripts) {
+	TraceLog(LOG_INFO, "Loading Registries...");
     if (textures == nullptr) {
         textures = AssetPath::root("textures", "json");
     }
+	TraceLog(LOG_INFO, "Loading Textures...");
 	if (!GlobalTextureRegistry->load(textures)) {
         return false;
     }
     if (tiles == nullptr) {
         tiles = AssetPath::root("tiles", "json");
     }
+	TraceLog(LOG_INFO, "Loading Tiles...");
     if (!GlobalMapTileRegistry->load(tiles, GlobalTextureRegistry)) {
         return false;
     }
 	if (scripts == nullptr) {
 		scripts = AssetPath::root("scripts", "json");
 	}
+	TraceLog(LOG_INFO, "Loading Scripts...");
 	if (!GlobalScriptRegistry->load(scripts, GloablScriptInterface)) {
 		return false;
 	}
 	if (entities == nullptr) {
 		entities = AssetPath::root("entities", "json");
 	}
+	TraceLog(LOG_INFO, "Loading Entities...");
 	if (!GlobalEntityRegistry->load(entities, GlobalTextureRegistry)) {
 		return false;
 	}
@@ -69,30 +75,32 @@ bool BR92Engine::LoadRegistries(char* textures, char* tiles, char* entities, cha
 
 #pragma region LoadConfigs
 void BR92Engine::LoadConfigs() {
+	TraceLog(LOG_INFO, "Loading Configs...");
 	// Initialize main config and set defaults
-	cfg = new MainConfig(MAIN_CONFIG_FILE);
+	cfg = MainConfig(MAIN_CONFIG_FILE);
 	// Initialize shader config and set defaults
-	scfg = new ShaderConfig(SHADER_CONFIG_FILE);
+	scfg = ShaderConfig(SHADER_CONFIG_FILE);
 	// Initialize dev config and set defaults
-	dcfg = new DevConfig(DEV_CONFIG_FILE);
+	dcfg = DevConfig(DEV_CONFIG_FILE);
 }
 #pragma endregion
 
 #pragma region LoadData
 void BR92Engine::LoadData() {
+	TraceLog(LOG_INFO, "Loading Map Data...");
     if (GlobalMapData == nullptr) {
         GlobalMapData = new MapData();
     }
 	GlobalMapData->SetTextureRegistry(GlobalTextureRegistry);
 	GlobalMapData->SetTileRegistry(GlobalMapTileRegistry);
-	GlobalMapData->renderDistance = cfg->getFloat("RenderDistance");
-	GlobalMapData->fogColor[0] = scfg->getByte("FogColorR") * 1/255.0f;
-	GlobalMapData->fogColor[1] = scfg->getByte("FogColorG") * 1/255.0f;
-	GlobalMapData->fogColor[2] = scfg->getByte("FogColorB") * 1/255.0f;
-	GlobalMapData->fogColor[3] = scfg->getByte("FogColorA") * 1/255.0f;
-	GlobalMapData->fogMin = scfg->getFloat("FogMin");
-	GlobalMapData->fogMax = scfg->getFloat("FogMax");
-	GlobalMapData->lightLevel = scfg->getFloat("LightLevel");
+	GlobalMapData->renderDistance = cfg["RenderDistance"].get<float>();
+	GlobalMapData->fogColor[0] = scfg["FogColorR"].get<float>() * 1/255.0f;
+	GlobalMapData->fogColor[1] = scfg["FogColorG"].get<float>() * 1/255.0f;
+	GlobalMapData->fogColor[2] = scfg["FogColorB"].get<float>() * 1/255.0f;
+	GlobalMapData->fogColor[3] = scfg["FogColorA"].get<float>() * 1/255.0f;
+	GlobalMapData->fogMin = scfg["FogMin"].get<float>();
+	GlobalMapData->fogMax = scfg["FogMax"].get<float>();
+	GlobalMapData->lightLevel = scfg["LightLevel"].get<float>();
 }
 #pragma endregion
 
@@ -103,6 +111,7 @@ bool BR92Engine::LoadLevel(char* name) {
     } else {
         levelFileName = name;
     }
+	TraceLog(LOG_INFO, "Loading Level %s...", name);
 	RBuffer readbuf;
 	readbuf.open(levelFileName);
 	GlobalEntityRenderer->clear();
@@ -130,6 +139,7 @@ bool BR92Engine::LoadLevel(char* name) {
 
 #pragma region UnloadLevel
 void BR92Engine::UnloadLevel() {
+	TraceLog(LOG_INFO, "Unloading Level...");
     GlobalMapData->ClearMap();
 }
 #pragma endregion
@@ -154,14 +164,35 @@ char* BR92Engine::LoadIndex() {
 #pragma endregion
 
 #pragma region OpenWindow
+#ifdef VR_SUPPORT
+bool BR92Engine::OpenWindowVR(char* title) {
+	OpenWindow(title);
+	if (!rlOpenXRSetup()) {
+		TraceLog(LOG_INFO, "[--!--] Failed to initialize rlOpenXR! Starting in Desktop mode... [--!--]");
+		return false;
+	}
+	rlSetFramebufferWidth(rlGetFramebufferWidth()*2);
+
+	SetupXRInputBindings();
+	xr.leftHand.handedness = RLOPENXR_HAND_LEFT;
+	xr.rightHand.handedness = RLOPENXR_HAND_RIGHT;
+	AssignXRHandInputBindings();
+
+	xr.handModel = LoadModelFromMesh(GenMeshCube(0.1f, 0.1f, 0.1f));
+
+	SetTargetFPS((targetFps = -1));
+	vr_mode = true;
+	return true;
+}
+#endif
 void BR92Engine::OpenWindow(char* title) {
 	SetConfigFlags(FLAG_WINDOW_RESIZABLE);
 	InitWindow(320, 240, title);
 
-	size_t win_w = cfg->getUnsigned("WindowSizeX");
-	size_t win_h = cfg->getUnsigned("WindowSizeY");
-	int win_x = cfg->getInteger("WindowPosX");
-	int win_y = cfg->getInteger("WindowPosY");
+	size_t win_w = cfg["WindowSizeX"].get<unsigned int>();
+	size_t win_h = cfg["WindowSizeY"].get<unsigned int>();
+	int win_x = cfg["WindowPosX"].get<int>();
+	int win_y = cfg["WindowPosY"].get<int>();
 	int m = GetCurrentMonitor();
 	if (win_w > GetMonitorWidth(m)) {
 		win_w = GetMonitorWidth(m);
@@ -173,18 +204,18 @@ void BR92Engine::OpenWindow(char* title) {
 	}
 	SetWindowSize(win_w, win_h);
 
-	if (cfg->getBool("WindowFullscreen")) {
+	if (cfg["WindowFullscreen"].get<bool>()) {
 		ToggleFullscreen();
-	} else if (cfg->getBool("WindowMaximized")) {
+	} else if (cfg["WindowMaximized"].get<bool>()) {
 		MaximizeWindow();
 	} else {
 		SetWindowPosition(win_x, win_y);
 	}
-	targetFps = cfg->getInteger("TargetFPS");
+	targetFps = cfg["TargetFPS"].get<float>();
 	if (targetFps != -1 && targetFps < 15) {
 		targetFps = 15;
 	}
-	mouseSensitivity = cfg->getFloat("MouseSensitivity");
+	mouseSensitivity = cfg["MouseSensitivity"].get<float>();
 
 	SetWindowMinSize(320, 240);
 	SetTargetFPS(targetFps);
@@ -194,15 +225,21 @@ void BR92Engine::OpenWindow(char* title) {
 	glGenVertexArrays(1, &postVao);
 
 	SetMousePosition(300, 220);
+	first_frame_timer = 0.125f;
+	vr_mode = false;
 }
 #pragma endregion
 
 #pragma region InitMesher
 void BR92Engine::InitMesher() {
+	TraceLog(LOG_INFO, "Initializing Mesher...");
 	float aspect = GetRenderHeight() / (float)GetRenderWidth();
-	renderScale = cfg->getUnsigned("RenderScale");
+	renderScale = cfg["RenderScale"].get<unsigned int>();
 	gameTexture = LoadRenderTexture(renderScale, renderScale*aspect);
 	screenTexture = LoadRenderTexture(GetRenderWidth(), GetRenderHeight());
+	if (vr_mode) {
+		menuTexture = LoadRenderTexture(640, 640);
+	}
 
 	GlobalMapData->BuildAtlas();
 	GlobalMapData->InitMesher(gameTexture.depth.id);
@@ -211,22 +248,24 @@ void BR92Engine::InitMesher() {
 
 #pragma region InitCamera
 void BR92Engine::InitCamera() {
-	camera.fovy = cfg->getFloat("FOVY");
-	camera.position.x = cfg->getFloat("PlayerX");
-	camera.position.y = cfg->getFloat("PlayerY");
-	camera.position.z = cfg->getFloat("PlayerZ");
-	camera.target.x = cfg->getFloat("PlayerTX");
-	camera.target.y = cfg->getFloat("PlayerTY");
-	camera.target.z = cfg->getFloat("PlayerTZ");
-	camera.up.x = cfg->getFloat("PlayerUX");
-	camera.up.y = cfg->getFloat("PlayerUY");
-	camera.up.z = cfg->getFloat("PlayerUZ");
+	TraceLog(LOG_INFO, "Initializing Main Camera...");
+	camera.fovy = cfg["FOVY"].get<float>();
+	camera.position.x = cfg["PlayerX"].get<float>();
+	camera.position.y = cfg["PlayerY"].get<float>();
+	camera.position.z = cfg["PlayerZ"].get<float>();;
+	camera.target.x = cfg["PlayerTX"].get<float>();
+	camera.target.y = cfg["PlayerTY"].get<float>();
+	camera.target.z = cfg["PlayerTZ"].get<float>();
+	camera.up.x = cfg["PlayerUX"].get<float>();
+	camera.up.y = cfg["PlayerUY"].get<float>();;
+	camera.up.z = cfg["PlayerUZ"].get<float>();;
 	camera.projection = CAMERA_PERSPECTIVE;
 }
 #pragma endregion
 
 #pragma region InitImGui
 void BR92Engine::InitImGui() {
+	TraceLog(LOG_INFO, "Initializing ImGui...");
 	rlImGuiSetup(true);
 
 	//you can use whatever imgui theme you like!
@@ -256,21 +295,21 @@ void BR92Engine::InitImGui() {
 #pragma region BeforeMainLoop
 void BR92Engine::BeforeMainLoop() {
 
-	save_on_exit = dcfg->getBool("SaveMapOnExit");
-	cheats_enabled = cfg->getBool("CheatsEnabled");
-	dev_enabled = dcfg->getBool("DevEnabled");
+	save_on_exit = dcfg["SaveMapOnExit"].get<bool>();
+	cheats_enabled = cfg["CheatsEnabled"].get<bool>();
+	dev_enabled = dcfg["DevEnabled"].get<bool>();
 	drawing_menus = false;
 	cursor_enabled = false;
 	DisableCursor();
-	is_first_frame = true;
+	first_frame_timer = true;
 	freecam = false;
 	godmode = false;
 	noclip = false;
 	post_process_enabled = false;
 	if (cheats_enabled) {
-		freecam = cfg->getBool("FreecamEnabled");
-		godmode = cfg->getBool("GodmodeEnabled");
-		noclip = cfg->getBool("NoclipEnabled");
+		freecam = cfg["FreecamEnabled"].get<bool>();
+		godmode = cfg["GodmodeEnabled"].get<bool>();
+		noclip = cfg["NoclipEnabled"].get<bool>();
 	}
 	playerSpeed = PLAYER_SPEED;
 	playerMomentumVertical = 0;
@@ -283,6 +322,7 @@ void BR92Engine::BeforeMainLoop() {
 
 #pragma region TryLoadLevel
 bool BR92Engine::TryLoadLevel(char* name) {
+	TraceLog(LOG_INFO, "Attempting to load level %s...", name);
     char* oldname = levelFileName;
     UnloadLevel();
     name = AssetPath::clone(name);
@@ -291,6 +331,7 @@ bool BR92Engine::TryLoadLevel(char* name) {
             // if (!LoadLevel(oldname)) {
             //     exit(1);
             // }
+			TraceLog(LOG_INFO, "Failed to load level %s, reloading original level...");
             LoadLevel(oldname);
             delete [] name;
             return false;
@@ -307,78 +348,140 @@ void BR92Engine::Draw() {
 		if (IsWindowResized()) {
 			ResizeWindow();
 		}
-#pragma region Begin Drawing
-		BeginDrawing();
-		// ClearBackground(BLACK);
 
-		// render the scene
-		BeginTextureMode(gameTexture);
-		{
-			Color tmp = {
+#pragma region VR Mode Drawing
+#ifdef VR_SUPPORT
+		if (vr_mode) {
+			SetTargetFPS(-1);
+			rlOpenXRUpdate();
+			rlOpenXRSyncSingleActionSet(xr.bindings.actionset);
+			rlOpenXRUpdateHands(&xr.leftHand, &xr.rightHand);
+			UpdateCamera(&camera, CAMERA_FREE); // Use mouse control as a debug option when no HMD is available
+			rlOpenXRUpdateCamera(&camera); // If the HMD is available, set the camera position to the HMD position
+
+			Color clearcolor = {
 				(unsigned char)(GlobalMapData->fogColor[0]*255.0f),
 				(unsigned char)(GlobalMapData->fogColor[1]*255.0f),
 				(unsigned char)(GlobalMapData->fogColor[2]*255.0f),
 				(unsigned char)(GlobalMapData->fogColor[3]*255.0f)
 			};
-			ClearBackground(tmp);
-		}
-		BeginMode3D(camera);
+			// rlOpenXRBegin() returns false when OpenXR reports to skip the frame (The HMD is inactive).
+			// Optionally rlOpenXRBeginMockHMD() can be chained to always render. It will render into a "Mock" backbuffer.
+			if (rlOpenXRBegin() || rlOpenXRBeginMockHMD()) { // Render to OpenXR backbuffer
+				ClearBackground(clearcolor);
 
-		GlobalMapData->Draw(camera.position, nullptr, renderScale);
-		// DrawPlane({0,0,0}, {5,5}, GRAY);
-		GlobalEntityRenderer->Draw(GlobalMapData, camera.position, renderScale);
+				BeginMode3D(camera);
+				// Draw Hands
+				Vector3 left_hand_axis;
+				float left_hand_angle;
+				QuaternionToAxisAngle(xr.leftHand.orientation, &left_hand_axis, &left_hand_angle);
 
-		EndMode3D();
+				Vector3 right_hand_axis;
+				float right_hand_angle;
+				QuaternionToAxisAngle(xr.rightHand.orientation, &right_hand_axis, &right_hand_angle);
 
-		EndTextureMode();
+				float left_value = GetXRActionValueFloat(xr.bindings.hand_activate_action, xr.bindings.hand_sub_paths[RLOPENXR_HAND_LEFT]);
+				float right_value = GetXRActionValueFloat(xr.bindings.hand_activate_action, xr.bindings.hand_sub_paths[RLOPENXR_HAND_RIGHT]);
+				Color left_color = left_value > 0.75f ? GREEN : ORANGE;
+				Color right_color = right_value > 0.75f ? GREEN : YELLOW;
 
-		// render the HUD and effects
-		BeginTextureMode(screenTexture);
+				DrawModelEx(xr.handModel, xr.leftHand.position, left_hand_axis, left_hand_angle * RAD2DEG, Vector3One(), left_color);
+				DrawModelEx(xr.handModel, xr.rightHand.position, right_hand_axis, right_hand_angle * RAD2DEG, Vector3One(), right_color);
 
-		DrawTexturePro(gameTexture.texture,
-			{0, (float)-gameTexture.texture.height, (float)gameTexture.texture.width, (float)-gameTexture.texture.height},
-			{0, 0, (float)GetRenderWidth(), (float)GetRenderHeight()},
-			{0,0}, 0.0f, WHITE);
+				GlobalMapData->Draw(camera.position, nullptr, renderScale, vr_mode);
+				GlobalEntityRenderer->Draw(GlobalMapData, camera.position, renderScale, vr_mode);
 
-
-		EndTextureMode();
-
-		if (post_process_enabled && IsShaderReady(postShader)) {
-			glUseProgram(postShader.id);
-			glActiveTexture(GL_TEXTURE0);
-			glBindTexture(GL_TEXTURE_2D, screenTexture.texture.id);
-			unsigned int loc = GetShaderLocation(postShader, "screenTexture");
-			glUniform1i(loc, 0);
-			loc = GetShaderLocation(postShader, "resolution");
-			glUniform2f(loc, screenTexture.texture.width, screenTexture.texture.height);
-			glDisable(GL_DEPTH_TEST);
-			glBindVertexArray(postVao);
-			glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-			glBindVertexArray(0);
-			glUseProgram(0);
+				EndMode3D();
+				rlOpenXRBlitToWindow(RLOPENXR_EYE_RIGHT, true);
+				// rlOpenXRBlitToWindow(RLOPENXR_EYE_BOTH, false);
+			}
+			rlOpenXREnd();
+#pragma endregion
 		} else {
-			DrawTexturePro(screenTexture.texture,
-				{0, (float)-screenTexture.texture.height, (float)screenTexture.texture.width, (float)-screenTexture.texture.height},
+#endif
+#pragma region Desktop Drawing
+			BeginDrawing();
+			// ClearBackground(BLACK);
+
+			// render the scene
+			BeginTextureMode(gameTexture);
+			{
+				Color tmp = {
+					(unsigned char)(GlobalMapData->fogColor[0]*255.0f),
+					(unsigned char)(GlobalMapData->fogColor[1]*255.0f),
+					(unsigned char)(GlobalMapData->fogColor[2]*255.0f),
+					(unsigned char)(GlobalMapData->fogColor[3]*255.0f)
+				};
+				ClearBackground(tmp);
+			}
+			BeginMode3D(camera);
+
+			GlobalMapData->Draw(camera.position, nullptr, renderScale, vr_mode);
+			// DrawPlane({0,0,0}, {5,5}, GRAY);
+			GlobalEntityRenderer->Draw(GlobalMapData, camera.position, renderScale, vr_mode);
+
+			EndMode3D();
+
+			EndTextureMode();
+
+			// render the HUD and effects
+			BeginTextureMode(screenTexture);
+
+			DrawTexturePro(gameTexture.texture,
+				{0, (float)-gameTexture.texture.height, (float)gameTexture.texture.width, (float)-gameTexture.texture.height},
 				{0, 0, (float)GetRenderWidth(), (float)GetRenderHeight()},
 				{0,0}, 0.0f, WHITE);
+
+
+			EndTextureMode();
+
+			if (post_process_enabled && IsShaderReady(postShader)) {
+				glUseProgram(postShader.id);
+				glActiveTexture(GL_TEXTURE0);
+				glBindTexture(GL_TEXTURE_2D, screenTexture.texture.id);
+				unsigned int loc = GetShaderLocation(postShader, "screenTexture");
+				glUniform1i(loc, 0);
+				loc = GetShaderLocation(postShader, "resolution");
+				glUniform2f(loc, screenTexture.texture.width, screenTexture.texture.height);
+				glDisable(GL_DEPTH_TEST);
+				glBindVertexArray(postVao);
+				glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+				glBindVertexArray(0);
+				glUseProgram(0);
+			} else {
+				DrawTexturePro(screenTexture.texture,
+					{0, (float)-screenTexture.texture.height, (float)screenTexture.texture.width, (float)-screenTexture.texture.height},
+					{0, 0, (float)GetRenderWidth(), (float)GetRenderHeight()},
+					{0,0}, 0.0f, WHITE);
+			}
+
+			char buffer[64];
+			DrawRectangle(1, 0, GetRenderWidth()-2, 23, DARKGRAY);
+			DrawLine(1, 24, GetRenderWidth()-2, 24, BLACK);
+			if (cheats_enabled) {
+				snprintf(buffer, sizeof(buffer), "%d", (int)camera.position.x);
+				DrawText(buffer, 100, 3, 20, WHITE);
+				snprintf(buffer, sizeof(buffer), "%d", (int)camera.position.y);
+				DrawText(buffer, 150, 3, 20, WHITE);
+				snprintf(buffer, sizeof(buffer), "%d", (int)camera.position.z);
+				DrawText(buffer, 200, 3, 20, WHITE);
+				// snprintf(buffer, sizeof(buffer), "%f", GlobalEntityRenderer->get(0)->timer);
+				// DrawText(buffer, 250, 3, 20, WHITE);
+			}
+			DrawFPS(4, 4);
+#ifdef VR_SUPPORT
 		}
 
-        char buffer[64];
-        DrawRectangle(1, 0, GetRenderWidth()-2, 23, DARKGRAY);
-		DrawLine(1, 24, GetRenderWidth()-2, 24, BLACK);
-		if (cheats_enabled) {
-			snprintf(buffer, sizeof(buffer), "%d", (int)camera.position.x);
-			DrawText(buffer, 100, 3, 20, WHITE);
-			snprintf(buffer, sizeof(buffer), "%d", (int)camera.position.y);
-			DrawText(buffer, 150, 3, 20, WHITE);
-			snprintf(buffer, sizeof(buffer), "%d", (int)camera.position.z);
-			DrawText(buffer, 200, 3, 20, WHITE);
-			// snprintf(buffer, sizeof(buffer), "%f", GlobalEntityRenderer->get(0)->timer);
-			// DrawText(buffer, 250, 3, 20, WHITE);
+		if (vr_mode) {
+			BeginDrawing();
+            DrawFPS(10, 10);
 		}
-		DrawFPS(4, 4);
+#endif
 
 		if (drawing_menus) {
+			if (vr_mode) {
+				BeginTextureMode(menuTexture);
+			}
 			rlImGuiBegin();
 
 			// ImGui::PushStyleColor(ImGuiCol_WindowBg, {});
@@ -392,7 +495,7 @@ void BR92Engine::Draw() {
 	// 		{
 	// 			ImGui::Begin("Game View", nullptr, ImGuiViewportFlags_NoRendererClear|ImGuiWindowFlags_NoCollapse);
 	// 			gameWindowPosition = ImGui::GetWindowPos();
-	// 			if (is_first_frame) {
+	// 			if (first_frame_timer) {
 	// 				ImGui::SetWindowSize({1920*0.75f, 1080*0.75f});
 	// 				ImGui::SetWindowPos({0,0});
 	// 			} else {
@@ -418,31 +521,37 @@ void BR92Engine::Draw() {
 				ImGui::Begin("Config");
 
 				bool windowIsFullscreen = IsWindowFullscreen();
-				if (ImGui::SliderInt("FPS Target", &targetFps, 15, 250)) {
-					if (targetFps >= 15) {
-						SetTargetFPS(targetFps);
+				if (!vr_mode) {
+					if (ImGui::SliderInt("FPS Target", &targetFps, 15, 250)) {
+						if (targetFps >= 15) {
+							SetTargetFPS(targetFps);
+						}
 					}
+					if (ImGui::Button("Unlimited")) {
+						targetFps = -1;
+						SetTargetFPS(-1);
+					}
+					if (ImGui::Checkbox("Fullscreen", &windowIsFullscreen)) {
+						ToggleFullscreen();
+					}
+					if (ImGui::SliderFloat("Mouse Sensitivity", &mouseSensitivity, 0.05f, 1.0f)) {}
 				}
-				if (ImGui::Button("Unlimited")) {
-					targetFps = -1;
-					SetTargetFPS(-1);
-				}
-				if (ImGui::Checkbox("Fullscreen", &windowIsFullscreen)) {
-					ToggleFullscreen();
-				}
-				if (ImGui::SliderFloat("Mouse Sensitivity", &mouseSensitivity, 0.05f, 1.0f)) {}
 				if (ImGui::SliderFloat("Render Distance", &GlobalMapData->renderDistance, 10.0f, 200.0f)) {}
-				if (ImGui::SliderInt("Render Scale", &renderScale, 320, 8192)) {
-					ResizeWindow();
+				if (!vr_mode) {
+					if (ImGui::SliderInt("Render Scale", &renderScale, 320, 8192)) {
+						ResizeWindow();
+					}
+					ImGui::Checkbox("Enable Post-processing", &post_process_enabled);
 				}
-				ImGui::Checkbox("Enable Post-processing", &post_process_enabled);
 				if (ImGui::Button("Take Screenshot (F2)")) {
 					this->TakeScreenshot(screenTexture.texture);
 				}
-				if (gameTexture.texture.width > 8192 || gameTexture.texture.height > 8192) {
-					ImGui::Text("Full-res screen screenshot unavailable (>8192px)");
-				} else if (ImGui::Button("Take Full-res Screenshot")) {
-					this->TakeScreenshot(gameTexture.texture);
+				if (!vr_mode) {
+					if (gameTexture.texture.width > 8192 || gameTexture.texture.height > 8192) {
+						ImGui::Text("Full-res screen screenshot unavailable (>8192px)");
+					} else if (ImGui::Button("Take Full-res Screenshot")) {
+						this->TakeScreenshot(gameTexture.texture);
+					}
 				}
 				ImGui::End();
 			}
@@ -530,16 +639,21 @@ void BR92Engine::Draw() {
 #pragma region End Drawing
 			rlImGuiEnd();
 
-            ImGuiIO& io_imgui = ImGui::GetIO();
-			if (io_imgui.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
-			{
-				ImGui::UpdatePlatformWindows();
-				ImGui::RenderPlatformWindowsDefault();
+			if (!vr_mode) {
+				ImGuiIO& io_imgui = ImGui::GetIO();
+				if (io_imgui.ConfigFlags & ImGuiConfigFlags_ViewportsEnable)
+				{
+					ImGui::UpdatePlatformWindows();
+					ImGui::RenderPlatformWindowsDefault();
+				}
+			}
+
+			if (vr_mode) {
+				EndTextureMode();
 			}
 		}
-
+		
 		EndDrawing();
-		is_first_frame = false;
 #pragma endregion
 }
 #pragma endregion
@@ -553,78 +667,83 @@ void BR92Engine::HandleInputs(float dt) {
         }
 		UnloadDroppedFiles(list);
     }
-    if (!cursor_enabled && !is_first_frame) {
-        Vector2 mouseDelta = GetMouseDelta();
-        SetMousePosition(gameWindowPosition.x, gameWindowPosition.y);
-        float delta = playerSpeed*dt;
-        if (IsKeyDown(KEY_LEFT_CONTROL)) {
-            delta *= 1.5f;
-        }
-        Vector3 oldPosition = camera.position;
-        if (IsKeyDown(KEY_W)) {
-            CameraMoveForward(&camera, delta, !freecam);
-        }
-        if (IsKeyDown(KEY_S)) {
-            CameraMoveForward(&camera, -delta, !freecam);
-        }
-        if (IsKeyDown(KEY_A)) {
-            CameraMoveRight(&camera, -delta, !freecam);
-        }
-        if (IsKeyDown(KEY_D)) {
-            CameraMoveRight(&camera, delta, !freecam);
-        }
-		// if (IsKeyDown(KEY_SPACE)) {
-		// 	unsigned short tid = GlobalMapData->get(oldPosition);
-		// 	if (tid != 0) {
-		// 		MapTile* tile = GlobalMapTileRegistry->of(tid);
-		// 		if (tile != nullptr) {
-		// 			if (tile->solidFloor) {
-		// 				playerMomentumVertical += PLAYER_JUMP;
-		// 			}
-		// 		}
-		// 	}
-		// }
-        Vector3 movement = Vector3Subtract(camera.position, oldPosition);
-        if (freecam) {
-            if (IsKeyDown(KEY_Z)) {
-                CameraMoveUp(&camera, delta);
-            }
-            if (IsKeyDown(KEY_X)) {
-                CameraMoveUp(&camera, -delta);
-            }
-        } else {
-            Vector3 adjustedPosition = GlobalMapData->MoveTo(oldPosition, movement, noclip);
-			if (!noclip) {
-				adjustedPosition = GlobalMapData->ApplyGravity(adjustedPosition, playerMomentumVertical, dt);
+	if (first_frame_timer > 0) {
+		first_frame_timer -= dt;
+	}
+	if (!vr_mode) {
+		if (!cursor_enabled && first_frame_timer <= 0) {
+			Vector2 mouseDelta = GetMouseDelta();
+			SetMousePosition(gameWindowPosition.x, gameWindowPosition.y);
+			float delta = playerSpeed*dt;
+			if (IsKeyDown(KEY_LEFT_CONTROL)) {
+				delta *= 1.5f;
 			}
-            Vector3 delta = Vector3Subtract(adjustedPosition, camera.position);
-            camera.position = Vector3Add(camera.position, delta);
-            camera.target = Vector3Add(camera.target, delta);
-        }
-        CameraYaw(&camera, -mouseDelta.x*dt*mouseSensitivity, false);
-        CameraPitch(&camera, -mouseDelta.y*dt*mouseSensitivity, true, false, false);
-        if (IsKeyPressed(KEY_ZERO)) {
-            cheats_enabled = !cheats_enabled;
-        }
-        if (IsKeyPressed(KEY_GRAVE)) {
-            dev_enabled = !dev_enabled;
-        }
-        if (IsKeyPressed(KEY_F2)) {
-			this->TakeScreenshot(screenTexture.texture);
-        }
-    }
+			Vector3 oldPosition = camera.position;
+			if (IsKeyDown(KEY_W)) {
+				CameraMoveForward(&camera, delta, !freecam);
+			}
+			if (IsKeyDown(KEY_S)) {
+				CameraMoveForward(&camera, -delta, !freecam);
+			}
+			if (IsKeyDown(KEY_A)) {
+				CameraMoveRight(&camera, -delta, !freecam);
+			}
+			if (IsKeyDown(KEY_D)) {
+				CameraMoveRight(&camera, delta, !freecam);
+			}
+			// if (IsKeyDown(KEY_SPACE)) {
+			// 	unsigned short tid = GlobalMapData->get(oldPosition);
+			// 	if (tid != 0) {
+			// 		MapTile* tile = GlobalMapTileRegistry->of(tid);
+			// 		if (tile != nullptr) {
+			// 			if (tile->solidFloor) {
+			// 				playerMomentumVertical += PLAYER_JUMP;
+			// 			}
+			// 		}
+			// 	}
+			// }
+			Vector3 movement = Vector3Subtract(camera.position, oldPosition);
+			if (freecam) {
+				if (IsKeyDown(KEY_Z)) {
+					CameraMoveUp(&camera, delta);
+				}
+				if (IsKeyDown(KEY_X)) {
+					CameraMoveUp(&camera, -delta);
+				}
+			} else {
+				Vector3 adjustedPosition = GlobalMapData->MoveTo(oldPosition, movement, noclip);
+				if (!noclip) {
+					adjustedPosition = GlobalMapData->ApplyGravity(adjustedPosition, playerMomentumVertical, dt);
+				}
+				Vector3 delta = Vector3Subtract(adjustedPosition, camera.position);
+				camera.position = Vector3Add(camera.position, delta);
+				camera.target = Vector3Add(camera.target, delta);
+			}
+			CameraYaw(&camera, -mouseDelta.x*dt*mouseSensitivity, false);
+			CameraPitch(&camera, -mouseDelta.y*dt*mouseSensitivity, true, false, false);
+			if (IsKeyPressed(KEY_ZERO)) {
+				cheats_enabled = !cheats_enabled;
+			}
+			if (IsKeyPressed(KEY_GRAVE)) {
+				dev_enabled = !dev_enabled;
+			}
+			if (IsKeyPressed(KEY_F2)) {
+				this->TakeScreenshot(screenTexture.texture);
+			}
+		}
 
-    if (IsKeyPressed(KEY_ESCAPE)) {
-        if (drawing_menus) {
-            drawing_menus = false;
-            cursor_enabled = false;
-            DisableCursor();
-        } else {
-            drawing_menus = true;
-            cursor_enabled = true;
-            EnableCursor();
-        }
-    }
+		if (IsKeyPressed(KEY_ESCAPE)) {
+			if (drawing_menus) {
+				drawing_menus = false;
+				cursor_enabled = false;
+				DisableCursor();
+			} else {
+				drawing_menus = true;
+				cursor_enabled = true;
+				EnableCursor();
+			}
+		}
+	}
 }
 #pragma endregion
 
@@ -644,6 +763,12 @@ void BR92Engine::EndWindow() {
 	}
 
 	rlImGuiShutdown();
+#ifdef VR_SUPPORT
+	if (vr_mode) {
+		rlOpenXRShutdown();
+		UnloadModel(xr.handModel);
+	}
+#endif
 	CloseWindow();
 }
 #pragma endregion
@@ -651,40 +776,40 @@ void BR92Engine::EndWindow() {
 #pragma region SaveConfigs
 void BR92Engine::SaveConfigs() {
 	Vector2 windowPos = GetWindowPosition();
-	cfg->setInteger("TargetFPS", targetFps);
-	cfg->setUnsigned("WindowSizeX", GetRenderWidth());
-	cfg->setUnsigned("WindowSizeY", GetRenderHeight());
-	cfg->setInteger("WindowPosX", windowPos.x);
-	cfg->setInteger("WindowPosY", windowPos.y + 20);
-	cfg->setBool("WindowMaximized", IsWindowMaximized());
-	cfg->setBool("WindowFullscreen", IsWindowFullscreen());
-    cfg->setFloat("FOVY", camera.fovy);
-    cfg->setFloat("PlayerX", camera.position.x);
-    cfg->setFloat("PlayerY", camera.position.y);
-    cfg->setFloat("PlayerZ", camera.position.z);
-    cfg->setFloat("PlayerTX", camera.target.x);
-    cfg->setFloat("PlayerTY", camera.target.y);
-    cfg->setFloat("PlayerTZ", camera.target.z);
-    cfg->setFloat("PlayerUX", camera.up.x);
-    cfg->setFloat("PlayerUY", camera.up.y);
-    cfg->setFloat("PlayerUZ", camera.up.z);
-	cfg->setFloat("RenderDistance", GlobalMapData->renderDistance);
-	cfg->setFloat("MouseSensitivity", mouseSensitivity);
-	cfg->setBool("CheatsEnabled", cheats_enabled);
-	cfg->setBool("FreecamEnabled", freecam);
-	cfg->setBool("GodmodeEnabled", godmode);
-	cfg->setBool("NoclipEnabled", noclip);
-	cfg->setUnsigned("RenderScale", renderScale);
-	cfg->save();
+	cfg["TargetFPS"] = targetFps;
+	cfg["WindowSizeX"] = GetRenderWidth();
+	cfg["WindowSizeY"] = GetRenderHeight();
+	cfg["WindowPosX"] = windowPos.x;
+	cfg["WindowPosY"] = windowPos.y + 20;
+	cfg["WindowMaximized"] = IsWindowMaximized();
+	cfg["WindowFullscreen"] = IsWindowFullscreen();
+    cfg["FOVY"] = camera.fovy;
+    cfg["PlayerX"] = camera.position.x;
+    cfg["PlayerY"] = camera.position.y;
+    cfg["PlayerZ"] = camera.position.z;
+    cfg["PlayerTX"] = camera.target.x;
+    cfg["PlayerTY"] = camera.target.y;
+    cfg["PlayerTZ"] = camera.target.z;
+    cfg["PlayerUX"] = camera.up.x;
+    cfg["PlayerUY"] = camera.up.y;
+    cfg["PlayerUZ"] = camera.up.z;
+	cfg["RenderDistance"] = GlobalMapData->renderDistance;
+	cfg["MouseSensitivity"] = mouseSensitivity;
+	cfg["CheatsEnabled"] = (bool)cheats_enabled;
+	cfg["FreecamEnabled"] = freecam;
+	cfg["GodmodeEnabled"] = godmode;
+	cfg["NoclipEnabled"] = noclip;
+	cfg["RenderScale"] = renderScale;
+	cfg.save();
 
-	scfg->setByte("FogColorR", GlobalMapData->fogColor[0]*255.0f);
-	scfg->setByte("FogColorG", GlobalMapData->fogColor[1]*255.0f);
-	scfg->setByte("FogColorB", GlobalMapData->fogColor[2]*255.0f);
-	scfg->setByte("FogColorA", GlobalMapData->fogColor[3]*255.0f);
-	scfg->setFloat("FogMin", GlobalMapData->fogMin);
-	scfg->setFloat("FogMax", GlobalMapData->fogMax);
-	scfg->setFloat("LightLevel", GlobalMapData->lightLevel);
-	scfg->save();
+	scfg["FogColorR"] = (unsigned int)GlobalMapData->fogColor[0]*255.0f;
+	scfg["FogColorG"] = (unsigned int)GlobalMapData->fogColor[1]*255.0f;
+	scfg["FogColorB"] = (unsigned int)GlobalMapData->fogColor[2]*255.0f;
+	scfg["FogColorA"] = (unsigned int)GlobalMapData->fogColor[3]*255.0f;
+	scfg["FogMin"] = GlobalMapData->fogMin;
+	scfg["FogMax"] = GlobalMapData->fogMax;
+	scfg["LightLevel"] = GlobalMapData->lightLevel;
+	scfg.save();
 }
 #pragma endregion
 
@@ -714,4 +839,170 @@ void BR92Engine::ResizeWindow() {
 	screenTexture = LoadRenderTexture(GetRenderWidth(), GetRenderHeight());
 }
 
+#pragma endregion
+
+#pragma region XR Binding
+#ifdef VR_SUPPORT
+void BR92Engine::SetupXRInputBindings() {
+	const RLOpenXRData* xr = rlOpenXRData();
+
+	XrResult result = xrStringToPath(xr->instance, "/user/hand/left", &this->xr.bindings.hand_sub_paths[RLOPENXR_HAND_LEFT]);
+	assert(XR_SUCCEEDED(result) && "Could not convert Left hand string to path.");
+	result = xrStringToPath(xr->instance, "/user/hand/right", &this->xr.bindings.hand_sub_paths[RLOPENXR_HAND_RIGHT]);
+	assert(XR_SUCCEEDED(result) && "Could not convert Right hand string to path.");
+
+	XrActionSetCreateInfo actionset_info;
+	actionset_info.type = XR_TYPE_ACTION_SET_CREATE_INFO;
+	actionset_info.next = NULL;
+	strncpy_s(actionset_info.actionSetName, XR_MAX_ACTION_SET_NAME_SIZE, 
+		"rlopenxr_hello_hands_actionset", XR_MAX_ACTION_SET_NAME_SIZE);
+	strncpy_s(actionset_info.localizedActionSetName, XR_MAX_LOCALIZED_ACTION_SET_NAME_SIZE, 
+		"OpenXR Hello Hands ActionSet", XR_MAX_LOCALIZED_ACTION_SET_NAME_SIZE);
+	actionset_info.priority = 0;
+
+	result = xrCreateActionSet(xr->instance, &actionset_info, &this->xr.bindings.actionset);
+	assert(XR_SUCCEEDED(result) && "Failed to create actionset.");
+
+	{
+		XrActionCreateInfo action_info;
+		action_info.type = XR_TYPE_ACTION_CREATE_INFO;
+		action_info.next = NULL;
+		strncpy_s(action_info.actionName, XR_MAX_ACTION_NAME_SIZE, 
+			"handpose", XR_MAX_ACTION_NAME_SIZE);
+		action_info.actionType = XR_ACTION_TYPE_POSE_INPUT;
+		action_info.countSubactionPaths = RLOPENXR_HAND_COUNT;
+		action_info.subactionPaths = this->xr.bindings.hand_sub_paths;
+		strncpy_s(action_info.localizedActionName, XR_MAX_LOCALIZED_ACTION_NAME_SIZE, 
+			"Hand Pose", XR_MAX_LOCALIZED_ACTION_NAME_SIZE);
+
+		result = xrCreateAction(this->xr.bindings.actionset, &action_info, &this->xr.bindings.hand_pose_action);
+		assert(XR_SUCCEEDED(result) && "Failed to create hand pose action");
+	}
+
+	{
+		XrActionCreateInfo action_info;
+		action_info.type = XR_TYPE_ACTION_CREATE_INFO;
+		action_info.next = NULL;
+		strncpy_s(action_info.actionName, XR_MAX_ACTION_NAME_SIZE, 
+			"activate", XR_MAX_ACTION_NAME_SIZE);
+		action_info.actionType = XR_ACTION_TYPE_FLOAT_INPUT;
+		action_info.countSubactionPaths = RLOPENXR_HAND_COUNT;
+		action_info.subactionPaths = this->xr.bindings.hand_sub_paths;
+		strncpy_s(action_info.localizedActionName, XR_MAX_LOCALIZED_ACTION_NAME_SIZE, 
+			"Activate", XR_MAX_LOCALIZED_ACTION_NAME_SIZE);
+
+		result = xrCreateAction(this->xr.bindings.actionset, &action_info, &this->xr.bindings.hand_activate_action);
+		assert(XR_SUCCEEDED(result) && "Failed to create hand activate action");
+	}
+
+	// poses can't be queried directly, we need to create a space for each
+	for (int hand = 0; hand < RLOPENXR_HAND_COUNT; hand++) {
+		XrPosef identity_pose = { { 0, 0, 0, 1}, {0, 0, 0} };
+
+		XrActionSpaceCreateInfo action_space_info;
+		action_space_info.type = XR_TYPE_ACTION_SPACE_CREATE_INFO;
+		action_space_info.next = NULL;
+		action_space_info.action = this->xr.bindings.hand_pose_action;
+		action_space_info.subactionPath = this->xr.bindings.hand_sub_paths[hand];
+		action_space_info.poseInActionSpace = identity_pose;
+
+		result = xrCreateActionSpace(xr->session, &action_space_info, &this->xr.bindings.hand_spaces[hand]);
+		assert(XR_SUCCEEDED(result) && "failed to create hand %d pose space");
+	}
+
+	XrPath grip_pose_paths[2] = { 0 };
+	xrStringToPath(xr->instance, "/user/hand/left/input/grip/pose", &grip_pose_paths[RLOPENXR_HAND_LEFT]);
+	xrStringToPath(xr->instance, "/user/hand/right/input/grip/pose", &grip_pose_paths[RLOPENXR_HAND_RIGHT]);
+
+	XrPath activate_paths[2] = { 0 };
+	xrStringToPath(xr->instance, "/user/hand/left/input/trigger/value", &activate_paths[RLOPENXR_HAND_LEFT]);
+	xrStringToPath(xr->instance, "/user/hand/right/input/trigger/value", &activate_paths[RLOPENXR_HAND_RIGHT]);
+
+	// khr/simple_controller Interaction Profile
+	{
+		XrPath interaction_profile_path;
+		result = xrStringToPath(xr->instance, "/interaction_profiles/khr/simple_controller", &interaction_profile_path);
+		assert(XR_SUCCEEDED(result) && "failed to get interaction profile");
+
+		XrActionSuggestedBinding action_suggested_bindings[] = {
+			{ this->xr.bindings.hand_pose_action, grip_pose_paths[RLOPENXR_HAND_LEFT] },
+			{ this->xr.bindings.hand_pose_action, grip_pose_paths[RLOPENXR_HAND_RIGHT] },
+		};
+		const int action_suggested_bindings_count = sizeof(action_suggested_bindings) / sizeof(action_suggested_bindings[0]);
+
+		XrInteractionProfileSuggestedBinding suggested_bindings;
+		suggested_bindings.type = XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING;
+		suggested_bindings.next = NULL;
+		suggested_bindings.interactionProfile = interaction_profile_path;
+		suggested_bindings.countSuggestedBindings = action_suggested_bindings_count;
+		suggested_bindings.suggestedBindings = action_suggested_bindings;
+
+		result = xrSuggestInteractionProfileBindings(xr->instance, &suggested_bindings);
+		assert(XR_SUCCEEDED(result) && "failed to suggest bindings for khr/simple_controller");
+	}
+
+	// oculus/touch_controller Interaction Profile
+	{
+		XrPath interaction_profile_path;
+		result = xrStringToPath(xr->instance, "/interaction_profiles/oculus/touch_controller", &interaction_profile_path);
+		assert(XR_SUCCEEDED(result) && "failed to get interaction profile");
+
+		XrActionSuggestedBinding action_suggested_bindings[] = {
+			{ this->xr.bindings.hand_pose_action, grip_pose_paths[RLOPENXR_HAND_LEFT]},
+			{ this->xr.bindings.hand_pose_action, grip_pose_paths[RLOPENXR_HAND_RIGHT]},
+			{ this->xr.bindings.hand_activate_action, activate_paths[RLOPENXR_HAND_LEFT] },
+			{ this->xr.bindings.hand_activate_action, activate_paths[RLOPENXR_HAND_RIGHT] },
+		};
+		const int action_suggested_bindings_count = sizeof(action_suggested_bindings) / sizeof(action_suggested_bindings[0]);
+
+		XrInteractionProfileSuggestedBinding suggested_bindings;
+		suggested_bindings.type = XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING;
+		suggested_bindings.next = NULL;
+		suggested_bindings.interactionProfile = interaction_profile_path;
+		suggested_bindings.countSuggestedBindings = action_suggested_bindings_count;
+		suggested_bindings.suggestedBindings = action_suggested_bindings;
+
+		result = xrSuggestInteractionProfileBindings(xr->instance, &suggested_bindings);
+		assert(XR_SUCCEEDED(result) && "failed to suggest bindings for oculus/touch_controller");
+	}
+
+	XrSessionActionSetsAttachInfo actionset_attach_info;
+	actionset_attach_info.type = XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO;
+	actionset_attach_info.next = NULL;
+	actionset_attach_info.countActionSets = 1;
+	actionset_attach_info.actionSets = &this->xr.bindings.actionset;
+	result = xrAttachSessionActionSets(xr->session, &actionset_attach_info);
+	assert(XR_SUCCEEDED(result) && "failed to attach action set");
+}
+
+
+void BR92Engine::AssignXRHandInputBindings()
+{
+	RLHand* hands[2] = { &xr.leftHand, &xr.rightHand };
+
+	for (int i = 0; i < RLOPENXR_HAND_COUNT; ++i)
+	{
+		hands[i]->hand_pose_action = xr.bindings.hand_pose_action;
+		hands[i]->hand_pose_subpath = xr.bindings.hand_sub_paths[i];
+		hands[i]->hand_pose_space = xr.bindings.hand_spaces[i];
+	}
+}
+
+
+float BR92Engine::GetXRActionValueFloat(XrAction action, XrPath sub_path) {
+	XrActionStateGetInfo activate_state_get_info;
+	activate_state_get_info.type = XR_TYPE_ACTION_STATE_GET_INFO;
+	activate_state_get_info.next = NULL;
+	activate_state_get_info.action = action;
+	activate_state_get_info.subactionPath = sub_path;
+
+	XrActionStateFloat activate_state;
+	activate_state.type = XR_TYPE_ACTION_STATE_FLOAT;
+	activate_state.next = NULL;
+	XrResult result = xrGetActionStateFloat(rlOpenXRData()->session, &activate_state_get_info, &activate_state);
+	assert(XR_SUCCEEDED(result) && "failed to get action state as a float");
+
+	return activate_state.currentState;
+}
+#endif
 #pragma endregion

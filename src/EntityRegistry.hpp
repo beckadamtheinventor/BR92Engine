@@ -1,11 +1,13 @@
 #pragma once
 
 #include "Helpers.hpp"
-#include "Json.hpp"
+#include "json/json.hpp"
 #include "Registry.hpp"
 #include "TextureRegistry.hpp"
 #include "ScriptRegistry.hpp"
 #include <fstream>
+
+using JSON = nlohmann::json;
 
 class EntityType {
     public:
@@ -31,25 +33,24 @@ class EntityRegistry : public Registry<EntityType> {
     bool load(const char* fname, TextureRegistry* GlobalTextureRegistry) {
         fname = AssetPath::clone(fname);
         this->add("none");
-        char* datastr;
         std::ifstream fd(fname);
-
         if (fd.is_open()) {
-            size_t count = fstreamlen(fd);
-            datastr = new char[count+1];
-            fd.read(datastr, count);
-            datastr[count] = 0;
+            JSON json;
+            try {
+                fd >> json;
+            } catch (nlohmann::detail::parse_error err) {
+                TraceLog(LOG_ERROR, "Failed to load json from file %s! %s", fname, err.what());
+                return false;
+            }
             fd.close();
-            JSON::JSON json = JSON::deserialize(datastr);
-            delete datastr;
-            if (json.contains("elements") && json["elements"].getType() == JSON::Type::Array) {
-                JSON::JSONArray& arr = json["elements"].getArray();
-                for (size_t i=0; i<arr.length; i++) {
-                    if (arr[i].getType() == JSON::Type::Object) {
-                        JSON::JSONObject& o = arr[i].getObject();
-                        const char* id;
-                        if (o.has("id") && o["id"].getType() == JSON::Type::String) {
-                            id = o["id"].getCString();
+            if (json.contains("elements") && json["elements"].is_array()) {
+                auto arr = json["elements"];
+                for (size_t i=0; i<arr.size(); i++) {
+                    if (arr[i].is_object()) {
+                        auto o = arr[i];
+                        std::string id;
+                        if (o.contains("id") && o["id"].is_string()) {
+                            id = o["id"].get<std::string>();
                         } else {
                             JsonFormatError(fname, "Elements array contains invalid member (missing string id)");
                             return false;
@@ -57,130 +58,128 @@ class EntityRegistry : public Registry<EntityType> {
                         EntityType* ent = this->add(id);
                         ent->name = nullptr;
                         memset(ent->textures, 0, sizeof(ent->textures));
-                        if (o.has("name")) {
-                            if (o["name"].getType() == JSON::Type::String) {
-                                ent->name = (char*)o["name"].getCString();
+                        if (o.contains("name")) {
+                            if (o["name"].is_string()) {
+                                ent->name = strdup(o["name"].get<std::string>().c_str());
                             } else {
                                 JsonFormatError(fname, "Elements array member contains invalid value for field", "name");
                                 return false;
                             }
                         }
-                        if (o.has("textures")) {
+                        if (o.contains("textures")) {
                             RegisteredTexture* tex;
-                            if (o["textures"].getType() == JSON::Type::String) {
-                                tex = GlobalTextureRegistry->of(o["textures"].getCString());
+                            if (o["textures"].is_string()) {
+                                tex = GlobalTextureRegistry->of(o["textures"].get<std::string>().c_str());
                                 if (tex == nullptr) {
-                                    JsonFormatError(fname, "Entity texture array contains missing texture ID", o["texture"].getCString());
+                                    JsonFormatError(fname, "Entity texture array contains missing texture ID", o["texture"].get<std::string>().c_str());
                                 }
-                            } else if (o["textures"].getType() == JSON::Type::Integer) {
-                                tex = GlobalTextureRegistry->of(o["textures"].getInteger());
+                            } else if (o["textures"].is_number()) {
+                                tex = GlobalTextureRegistry->of(o["textures"]);
                                 if (tex == nullptr) {
-                                    JsonFormatError(fname, "Entity texture array contains missing texture ID", o["texture"].getInteger());
+                                    JsonFormatError(fname, "Entity texture array contains missing texture ID", o["texture"].get<unsigned int>());
                                 }
-                            } else if (o["textures"].getType() == JSON::Type::Array) {
-                                JSON::JSONArray& tarr = o["textures"].getArray();
-                                for (size_t i=0; i<tarr.length; i++) {
+                            } else if (o["textures"].is_array()) {
+                                auto tarr = o["textures"];
+                                for (size_t i=0; i<tarr.size(); i++) {
                                     if (i >= 16) {
                                         break;
                                     }
-                                    if (tarr[i].getType() == JSON::Type::String) {
-                                        tex = GlobalTextureRegistry->of(tarr[i].getCString());
+                                    if (tarr[i].is_string()) {
+                                        tex = GlobalTextureRegistry->of(tarr[i].get<std::string>().c_str());
                                         if (tex == nullptr) {
-                                            JsonFormatError(fname, "Entity texture array contains missing texture ID", tarr[i].getCString());
+                                            JsonFormatError(fname, "Entity texture array contains missing texture ID", tarr[i].get<std::string>().c_str());
                                         }
                                         ent->textures[i] = tex->id;
-                                    } else if (tarr[i].getType() == JSON::Type::Integer) {
-                                        tex = GlobalTextureRegistry->of(tarr[i].getInteger());
+                                    } else if (tarr[i].is_number()) {
+                                        tex = GlobalTextureRegistry->of(tarr[i].get<unsigned int>());
                                         if (tex == nullptr) {
-                                            JsonFormatError(fname, "Entity texture array contains missing texture ID", tarr[i].getInteger());
+                                            JsonFormatError(fname, "Entity texture array contains missing texture ID", tarr[i].get<unsigned int>());
                                         }
                                         ent->textures[i] = tex->id;
                                     } else {
                                         JsonFormatError(fname, "Entity textures array member contains invalid value (should be string/int)");
                                     }
                                 }
-                                ent->nframes = tarr.length;
+                                ent->nframes = tarr.size();
                             } else {
                                 JsonFormatError(fname, "Elements array member contains invalid value (should be string/int or array of string/int) for field", "textures");
                             }
-                            if (o.has("frametime")) {
-                                if (o["frametime"].getType() == JSON::Type::Float) {
-                                    ent->frametime = o["frametime"].getFloat();
+                            if (o.contains("frametime")) {
+                                if (o["frametime"].is_number()) {
+                                    ent->frametime = o["frametime"].get<float>();
                                 } else {
                                     JsonFormatError(fname, "Elements array member contains invalid value (should be float) for field", "frametime");
                                 }
                             }
                         }
-                        if (o.has("scale")) {
-                            if (o["scale"].getType() == JSON::Type::Float) {
-                                ent->scale = o["scale"].getFloat();
-                            } else if (o["scale"].getType() == JSON::Type::Integer) {
-                                ent->scale = o["scale"].getInteger();
+                        if (o.contains("scale")) {
+                            if (o["scale"].is_number()) {
+                                ent->scale = o["scale"].get<float>();
                             } else {
                                 JsonFormatError(fname, "Elements array member contains invalid value (should be float/int) for field", "scale");
                             }
                         }
-                        if (o.has("canmove")) {
-                            if (o["canmove"].getType() == JSON::Type::Boolean) {
-                                ent->canmove = o["canmove"].getBoolean();
+                        if (o.contains("canmove")) {
+                            if (o["canmove"].is_boolean()) {
+                                ent->canmove = o["canmove"].get<bool>();
                             } else {
                                 JsonFormatError(fname, "Elements array member contains invalid value (should be bool) for field", "canmove");
                             }
                         }
-                        if (o.has("facesplayer")) {
-                            if (o["facesplayer"].getType() == JSON::Type::Boolean) {
-                                ent->facesplayer = o["facesplayer"].getBoolean();
+                        if (o.contains("facesplayer")) {
+                            if (o["facesplayer"].is_boolean()) {
+                                ent->facesplayer = o["facesplayer"].get<bool>();
                             } else {
                                 JsonFormatError(fname, "Elements array member contains invalid value (should be bool) for field", "facesplayer");
                             }
                         }
-                        if (o.has("script")) {
-                            if (o["script"].getType() == JSON::Type::Object) {
-                                JSON::JSONObject& oo = o["script"].getObject();
-                                if (oo.has("init")) {
-                                    if (oo["init"].getType() == JSON::Type::String) {
-                                        Script* script = GlobalScriptRegistry->of(oo["init"].getCString());
+                        if (o.contains("script")) {
+                            if (o["script"].is_object()) {
+                                auto oo = o["script"];
+                                if (oo.contains("init")) {
+                                    if (oo["init"].is_string()) {
+                                        Script* script = GlobalScriptRegistry->of(oo["init"].get<std::string>().c_str());
                                         if (script == nullptr) {
-                                            JsonFormatError(fname, "Elements array member references non-existant script id", oo["init"].getCString());
+                                            JsonFormatError(fname, "Elements array member references non-existent script id", oo["init"].get<std::string>().c_str());
                                         }
                                         ent->script_init = script->id;
-                                    } else if (oo["init"].getType() == JSON::Type::Integer) {
-                                        Script* script = GlobalScriptRegistry->of(oo["init"].getInteger());
+                                    } else if (oo["init"].is_number()) {
+                                        Script* script = GlobalScriptRegistry->of(oo["init"].get<unsigned int>());
                                         if (script == nullptr) {
-                                            JsonFormatError(fname, "Elements array member references non-existant script id", oo["init"].getInteger());
+                                            JsonFormatError(fname, "Elements array member references non-existent script id", oo["init"].get<unsigned int>());
                                         }
                                         ent->script_init = script->id;
                                     } else {
                                         JsonFormatError(fname, "Elements array member contains invalid valid (should be string/int) for field", "script>init");
                                     }
                                 }
-                                if (oo.has("update")) {
-                                    if (oo["update"].getType() == JSON::Type::String) {
-                                        Script* script = GlobalScriptRegistry->of(oo["update"].getCString());
+                                if (oo.contains("update")) {
+                                    if (oo["update"].is_string()) {
+                                        Script* script = GlobalScriptRegistry->of(oo["update"].get<std::string>().c_str());
                                         if (script == nullptr) {
-                                            JsonFormatError(fname, "Elements array member references non-existant script id", oo["update"].getCString());
+                                            JsonFormatError(fname, "Elements array member references non-existent script id", oo["update"].get<std::string>().c_str());
                                         }
                                         ent->script = script->id;
-                                    } else if (oo["update"].getType() == JSON::Type::Integer) {
-                                        Script* script = GlobalScriptRegistry->of(oo["update"].getInteger());
+                                    } else if (oo["update"].is_number()) {
+                                        Script* script = GlobalScriptRegistry->of(oo["update"].get<unsigned int>());
                                         if (script == nullptr) {
-                                            JsonFormatError(fname, "Elements array member references non-existant script id", oo["update"].getInteger());
+                                            JsonFormatError(fname, "Elements array member references non-existent script id", oo["update"].get<unsigned int>());
                                         }
                                         ent->script = script->id;
                                     } else {
                                         JsonFormatError(fname, "Elements array member contains invalid valid (should be string/int) for field", "script>update");
                                     }
                                 }
-                            } else if (o["script"].getType() == JSON::Type::String) {
-                                Script* script = GlobalScriptRegistry->of(o["script"].getCString());
+                            } else if (o["script"].is_string()) {
+                                Script* script = GlobalScriptRegistry->of(o["script"].get<std::string>().c_str());
                                 if (script == nullptr) {
-                                    JsonFormatError(fname, "Elements array member references non-existant script id", o["script"].getCString());
+                                    JsonFormatError(fname, "Elements array member references non-existent script id", o["script"].get<std::string>().c_str());
                                 }
                                 ent->script = script->id;
-                            } else if (o["script"].getType() == JSON::Type::Integer) {
-                                Script* script = GlobalScriptRegistry->of(o["script"].getInteger());
+                            } else if (o["script"].is_number()) {
+                                Script* script = GlobalScriptRegistry->of(o["script"].get<unsigned int>());
                                 if (script == nullptr) {
-                                    JsonFormatError(fname, "Elements array member references non-existant script id", o["script"].getInteger());
+                                    JsonFormatError(fname, "Elements array member references non-existent script id", o["script"].get<unsigned int>());
                                 }
                                 ent->script = script->id;
                             } else {

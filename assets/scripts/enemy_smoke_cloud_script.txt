@@ -44,7 +44,7 @@ push
 arg 0
 randomTeleportEntity
 
-arg0
+arg 0
 canSeePlayer
 bz @eof
 

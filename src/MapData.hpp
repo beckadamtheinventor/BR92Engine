@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DynamicArray.hpp"
+#include <vector>
 #include "Array2D.hpp"
 #include "TileRegistry.hpp"
 #include "TextureRegistry.hpp"
@@ -10,6 +10,7 @@
 #include "raylib.h"
 #include "rlgl.h"
 #include "external/glad.h"
+#include <vector>
 
 #pragma region Defines
 #define TILE_MAP_MAGIC_NUMBER_STR "TILE"
@@ -121,17 +122,17 @@ struct HitInfo {
 
 #pragma region MapData
 class MapData {
-    DynamicArray<Vec3I> positions;
-    DynamicArray<TileArray> maps;
-    DynamicArray<MapIntMesh*> MapIntMeshes;
-    DynamicArray<LightMap*> lightmaps;
-    DynamicArray<PlacedLight> lightList;
+    std::vector<Vec3I> positions;
+    std::vector<TileArray> maps;
+    std::vector<MapIntMesh*> MapIntMeshes;
+    std::vector<LightMap*> lightmaps;
+    std::vector<PlacedLight> lightList;
     MapTileRegistry* tileRegistry = nullptr;
     TextureRegistry* textureRegistry = nullptr;
     unsigned int depthTextureId;
     bool hasLoadedLightmaps = false;
     public:
-    DynamicArray<Vector3> spawnableSpaces;
+    std::vector<Vector3> spawnableSpaces;
     Shader mainShader, spriteShader;
     Texture2D atlas = {0};
     float fogMin, fogMax, fogColor[4], lightLevel, renderDistance;
@@ -169,7 +170,8 @@ class MapData {
     Color* getLight(int x, int y, int z);
     void addLight(int x, int y, int z, float v, unsigned char r, unsigned char g, unsigned char b);
     bool ShouldRenderMap(Vector3 pos, size_t mapno);
-    void Draw(Vector3 camerapos, Matrix* mat=nullptr, float renderwidth=1920);
+    void Draw(Vector3 camerapos, Matrix* mat=nullptr, float renderwidth=1920, bool vr_mode=false);
+    void _Draw(Vector3 camerapos, Matrix* mat, float renderwidth);
     void SetFog(float fogMin, float fogMax, float* fogColor);
     Vector3 MoveTo(Vector3 position, Vector3 move, bool noclip=false);
     Vector3 ApplyGravity(Vector3 position, float& momentum, float dt);

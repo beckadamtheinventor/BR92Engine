@@ -4,7 +4,6 @@
 #include <cmath>
 #include <cstdio>
 #include "ScriptInterface.hpp"
-#include "raylib.h"
 
 class ScriptBytecode {
     typedef union { long long i; double f; } i64;

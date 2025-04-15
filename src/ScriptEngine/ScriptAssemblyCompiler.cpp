@@ -1,5 +1,6 @@
 #include "ScriptAssemblyCompiler.hpp"
 #include "../Registries.hpp"
+#include "raylib.h"
 
 static constexpr const char *opcodes[] {
     "nop", "rv", "returnDoNothing", "returnFail", "returnDestroy",
@@ -47,7 +48,7 @@ size_t ScriptAssemblyCompiler::compile(const char *data, size_t datalen, unsigne
     do {
         tk = next(data, datalen, inoffset);
         if (tk >= Nop && tk < None) {
-            outbuf.append(tk);
+            outbuf.push_back(tk);
             switch (tk) {
                 case LoadVar:
                 case StoreVar:
@@ -56,13 +57,13 @@ size_t ScriptAssemblyCompiler::compile(const char *data, size_t datalen, unsigne
                 case PushArg:
                 case PushVar:
                     tk = next(data, datalen, inoffset);
-                    outbuf.append(token_int);
+                    outbuf.push_back(token_int);
                     break;
                 case Return:
                     tk = next(data, datalen, inoffset);
-                    outbuf.append(token_int);
+                    outbuf.push_back(token_int);
                     tk = next(data, datalen, inoffset);
-                    outbuf.append(token_int);
+                    outbuf.push_back(token_int);
                     break;
                 case ReturnDoNothing:
                     break;
@@ -71,39 +72,39 @@ size_t ScriptAssemblyCompiler::compile(const char *data, size_t datalen, unsigne
                 case Immediate8B:
                 case Immediate8UB:
                     tk = next(data, datalen, inoffset);
-                    outbuf.append(token_int);
+                    outbuf.push_back(token_int);
                     break;
                 case Immediate16:
                 case Immediate16U:
                 case Immediate16B:
                 case Immediate16UB:
                     tk = next(data, datalen, inoffset);
-                    outbuf.append(token_int);
-                    outbuf.append(token_int >> 8);
+                    outbuf.push_back(token_int);
+                    outbuf.push_back(token_int >> 8);
                     break;
                 case Immediate32:
                 case Immediate32U:
                 case Immediate32B:
                 case Immediate32UB:
                     tk = next(data, datalen, inoffset);
-                    outbuf.append(token_int);
-                    outbuf.append(token_int >> 8);
-                    outbuf.append(token_int >> 16);
-                    outbuf.append(token_int >> 24);
+                    outbuf.push_back(token_int);
+                    outbuf.push_back(token_int >> 8);
+                    outbuf.push_back(token_int >> 16);
+                    outbuf.push_back(token_int >> 24);
                     break;
                 case Immediate64:
                 case Immediate64B:
                 case Immediate64U:
                 case Immediate64UB:
                     tk = next(data, datalen, inoffset);
-                    outbuf.append(token_int);
-                    outbuf.append(token_int >>  8);
-                    outbuf.append(token_int >> 16);
-                    outbuf.append(token_int >> 24);
-                    outbuf.append(token_int >> 32);
-                    outbuf.append(token_int >> 40);
-                    outbuf.append(token_int >> 48);
-                    outbuf.append(token_int >> 56);
+                    outbuf.push_back(token_int);
+                    outbuf.push_back(token_int >>  8);
+                    outbuf.push_back(token_int >> 16);
+                    outbuf.push_back(token_int >> 24);
+                    outbuf.push_back(token_int >> 32);
+                    outbuf.push_back(token_int >> 40);
+                    outbuf.push_back(token_int >> 48);
+                    outbuf.push_back(token_int >> 56);
                     break;
                 case BA:
                 case BZ:
@@ -113,27 +114,27 @@ size_t ScriptAssemblyCompiler::compile(const char *data, size_t datalen, unsigne
                 case JSRNZ:
                     tk = next(data, datalen, inoffset);
                     if (tk == LabelUsage) {
-                        outbuf.append(0);
-                        outbuf.append(0);
+                        outbuf.push_back(0);
+                        outbuf.push_back(0);
                     } else {
-                        outbuf.append(token_int);
-                        outbuf.append(token_int >> 8);
+                        outbuf.push_back(token_int);
+                        outbuf.push_back(token_int >> 8);
                     }
                     break;
                 case BZSet32:
                 case BNZSet32:
                     tk = next(data, datalen, inoffset);
-                    outbuf.append(token_int);
-                    outbuf.append(token_int >> 8);
-                    outbuf.append(token_int >> 16);
-                    outbuf.append(token_int >> 24);
+                    outbuf.push_back(token_int);
+                    outbuf.push_back(token_int >> 8);
+                    outbuf.push_back(token_int >> 16);
+                    outbuf.push_back(token_int >> 24);
                     tk = next(data, datalen, inoffset);
                     if (tk == LabelUsage) {
-                        outbuf.append(0);
-                        outbuf.append(0);
+                        outbuf.push_back(0);
+                        outbuf.push_back(0);
                     } else {
-                        outbuf.append(token_int);
-                        outbuf.append(token_int >> 8);
+                        outbuf.push_back(token_int);
+                        outbuf.push_back(token_int >> 8);
                     }
                 default:
                     break;
@@ -141,9 +142,9 @@ size_t ScriptAssemblyCompiler::compile(const char *data, size_t datalen, unsigne
         }
     } while (inoffset < datalen);
 
-    labels.add("eof", outbuf.length());
+    labels.add("eof", outbuf.size());
 
-    for (size_t i=0; i<labelusages.length(); i++) {
+    for (size_t i=0; i<labelusages.size(); i++) {
         labelusage_t *lbl = &labelusages[i];
         const char *name = lbl->label;
         size_t value = -1;
@@ -152,17 +153,18 @@ size_t ScriptAssemblyCompiler::compile(const char *data, size_t datalen, unsigne
             value = labels[lbl->label];
         } else {
             // label not found / not resolved
-            printf("Warning: error loading script: Unknown label name \"%s\" (line %llu)\n", name, lbl->lno);
+            TraceLog(LOG_WARNING, "Warning: error loading script: Unknown label name \"%s\" (line %llu)\n", name, lbl->lno);
         }
         // set resolved label address
         outbuf[lbl->offset+0] = value;
         outbuf[lbl->offset+1] = value >> 8;
     }
 
-    outbuf.append(End);
-    *out = outbuf.collapse();
-
-    return outbuf.length();
+    outbuf.push_back(End);
+    unsigned char* outdata = new unsigned char[outbuf.size()];
+    memcpy(outdata, outbuf.data(), outbuf.size());
+    *out = outdata;
+    return outbuf.size();
 }
 
 char ScriptAssemblyCompiler::peek(const char *data, size_t datalen, size_t i) {
@@ -221,7 +223,7 @@ ScriptAssemblyCompiler::Token ScriptAssemblyCompiler::next(const char *data, siz
         } else if (consumeToken(data, datalen, i, "entity:")) {
             isentity = true;
         } else {
-            printf("Script Warning: Unknown content type on line %llu\n", lno);
+            TraceLog(LOG_WARNING, "Script Warning: Unknown content type on line %llu\n", lno);
             token_int = 0;
         }
 
@@ -234,7 +236,7 @@ ScriptAssemblyCompiler::Token ScriptAssemblyCompiler::next(const char *data, siz
         if (istexture) {
             RegisteredTexture* tex = GlobalTextureRegistry->of(contentid);
             if (tex == nullptr) {
-                printf("Script Warning: Unknown texture id \"%s\" on line %llu\n", contentid, lno);
+                TraceLog(LOG_WARNING, "Script Warning: Unknown texture id \"%s\" on line %llu\n", contentid, lno);
                 token_int = 0;
             } else {
                 token_int = tex->id;
@@ -242,7 +244,7 @@ ScriptAssemblyCompiler::Token ScriptAssemblyCompiler::next(const char *data, siz
         } else if (istile) {
             MapTile* tile = GlobalMapTileRegistry->of(contentid);
             if (tile == nullptr) {
-                printf("Script Warning: Unknown tile id \"%s\" on line %llu\n", contentid, lno);
+                TraceLog(LOG_WARNING, "Script Warning: Unknown tile id \"%s\" on line %llu\n", contentid, lno);
                 token_int = 0;
             } else {
                 token_int = tile->id;
@@ -250,7 +252,7 @@ ScriptAssemblyCompiler::Token ScriptAssemblyCompiler::next(const char *data, siz
         } else if (isentity) {
             EntityType* ent = GlobalEntityRegistry->of(contentid);
             if (ent == nullptr) {
-                printf("Script Warning: Unknown entity id \"%s\" on line %llu\n", contentid, lno);
+                TraceLog(LOG_WARNING, "Script Warning: Unknown entity id \"%s\" on line %llu\n", contentid, lno);
                 token_int = 0;
             } else {
                 token_int = ent->id;
@@ -353,9 +355,9 @@ ScriptAssemblyCompiler::Token ScriptAssemblyCompiler::next(const char *data, siz
         i--;
         const char *name = subcstr(data, datalen, j, i-j);
         if (labels.has(name)) {
-            labels[name] = outbuf.length();
+            labels[name] = outbuf.size();
         } else {
-            token_int = outbuf.length();
+            token_int = outbuf.size();
             labels.add(name, token_int);
         }
         tk = Label;
@@ -368,7 +370,7 @@ ScriptAssemblyCompiler::Token ScriptAssemblyCompiler::next(const char *data, siz
         } while (c > ' ');
         i--;
         const char *name = subcstr(data, datalen, j, i-j);
-        labelusages.append({outbuf.length(), lno, name});
+        labelusages.push_back({outbuf.size(), lno, name});
         tk = LabelUsage;
     } else if (c >= 'a' && c <= 'z') {
         size_t j = i;
@@ -396,12 +398,12 @@ ScriptAssemblyCompiler::Token ScriptAssemblyCompiler::next(const char *data, siz
             }
         }
         if (token_int == -1) {
-            printf("Warning: error loading script: Unknown opcode '%s' (line %llu)\n", name, lno);
+            TraceLog(LOG_WARNING, "Warning: error loading script: Unknown opcode '%s' (line %llu)\n", name, lno);
         } else {
             tk = (Token)token_int;
         }
     } else {
-        printf("Warning: error loading script: Unexpected character '%c' (line %llu)\n", c, lno);
+        TraceLog(LOG_WARNING, "Warning: error loading script: Unexpected character '%c' (line %llu)\n", c, lno);
         i++;
     }
 

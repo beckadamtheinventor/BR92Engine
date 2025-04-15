@@ -2,11 +2,15 @@
 
 #include "AssetPath.hpp"
 #include "Helpers.hpp"
-#include "Json.hpp"
+#include "json/json.hpp"
 #include "Registry.hpp"
 #include "ScriptEngine/ScriptAssemblyCompiler.hpp"
 #include "ScriptEngine/ScriptBytecode.hpp"
 #include "ScriptEngine/ScriptInterface.hpp"
+#include "raylib.h"
+#include <ios>
+
+using JSON = nlohmann::json;
 
 class Script {
     public:
@@ -25,7 +29,7 @@ class Script {
         code = ScriptBytecode(bytecode, len);
     }
     bool load(const char* fname) {
-        std::ifstream fd(fname);
+        std::ifstream fd(fname, std::ios::in | std::ios::binary);
         if (fd.is_open()) {
             size_t count = fstreamlen(fd);
             char* datastr = new char[count];
@@ -47,32 +51,32 @@ class ScriptRegistry : public Registry<Script> {
     bool load(const char* fname, ScriptInterface* interface) {
         fname = AssetPath::clone(fname);
         this->add("none");
-        char* datastr;
         std::ifstream fd(fname);
         if (fd.is_open()) {
-            size_t count = fstreamlen(fd);
-            datastr = new char[count+1];
-            fd.read(datastr, count);
-            datastr[count] = 0;
+            JSON json;
+            try {
+                fd >> json;
+            } catch (nlohmann::detail::parse_error err) {
+                TraceLog(LOG_ERROR, "Failed to load json from file %s! %s", fname, err.what());
+                return false;
+            }
             fd.close();
-            JSON::JSON json = JSON::deserialize(datastr);
-            delete datastr;
-            if (json.contains("elements") && json["elements"].getType() == JSON::Type::Array) {
-                JSON::JSONArray& arr = json["elements"].getArray();
-                for (size_t i=0; i<arr.length; i++) {
-                    if (arr[i].getType() == JSON::Type::Object) {
-                        JSON::JSONObject& o = arr[i].getObject();
-                        const char* id;
-                        if (o.has("id") && o["id"].getType() == JSON::Type::String) {
-                            id = o["id"].getCString();
+            if (json.contains("elements") && json["elements"].is_array()) {
+                auto arr = json["elements"];
+                for (size_t i=0; i<arr.size(); i++) {
+                    if (arr[i].is_object()) {
+                        auto o = arr[i];
+                        std::string id;
+                        if (o.contains("id") && o["id"].is_string()) {
+                            id = o["id"].get<std::string>();
                         } else {
                             JsonFormatError(fname, "Elements array contains invalid member (missing string id)");
                             return false;
                         }
                         Script* script = this->add(id);
-                        if (o.has("script")) {
-                            if (o["script"].getType() == JSON::Type::String) {
-                                script->load(AssetPath::root(o["script"].getCString(), nullptr));
+                        if (o.contains("script")) {
+                            if (o["script"].is_string()) {
+                                script->load(AssetPath::root(o["script"].get<std::string>().c_str(), nullptr));
                             } else {
                                 JsonFormatError(fname, "Elements array member script component should be string (file name)");
                                 return false;

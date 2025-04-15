@@ -2,8 +2,8 @@
 #define __SCRIPT_ASSEMBLY_COMPILER_HPP__
 
 #include "../Dictionary.hpp"
-#include "../DynamicArray.hpp"
 #include <string.h>
+#include <vector>
 
 class ScriptAssemblyCompiler {
     Dictionary<size_t> vars;
@@ -13,8 +13,8 @@ class ScriptAssemblyCompiler {
         const char *label;
     } labelusage_t;
     Dictionary<size_t> labels;
-    DynamicArray<labelusage_t, 128> labelusages;
-    DynamicArray<unsigned char, 512> outbuf;
+    std::vector<labelusage_t> labelusages;
+    std::vector<unsigned char> outbuf;
 
     union {
         long long token_int;

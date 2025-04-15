@@ -1,10 +1,13 @@
 #pragma once
 
-#include "Json.hpp"
+#include "json/json.hpp"
 #include "Registry.hpp"
 #include "TextureRegistry.hpp"
 #include "Helpers.hpp"
+#include "raylib.h"
 #include <fstream>
+
+using JSON = nlohmann::json;
 
 #pragma region MapTile
 class MapTile {
@@ -38,47 +41,46 @@ class MapTileRegistry : public Registry<MapTile> {
         tile->flags = 0;
         tile->light = tile->tintr = tile->tintg = tile->tintb = 0;
 
-        char* datastr;
         std::ifstream fd(fname);
-
         if (fd.is_open()) {
-            size_t count = fstreamlen(fd);
-            datastr = new char[count+1];
-            fd.read(datastr, count);
-            datastr[count] = 0;
+            JSON json;
+            try {
+                fd >> json;
+            } catch (nlohmann::detail::parse_error err) {
+                TraceLog(LOG_ERROR, "Failed to load json from file %s! %s", fname, err.what());
+                return false;
+            }
             fd.close();
-            JSON::JSON json = JSON::deserialize(datastr);
-            delete datastr;
-            if (json.contains("elements") && json["elements"].getType() == JSON::Type::Array) {
-                JSON::JSONArray& arr = json["elements"].getArray();
-                for (size_t i=0; i<arr.length; i++) {
-                    if (arr[i].getType() == JSON::Type::Object) {
-                        JSON::JSONObject& o = arr[i].getObject();
-                        const char* id;
-                        if (o.has("id") && o["id"].getType() == JSON::Type::String) {
-                            id = o["id"].getCString();
+            if (json.contains("elements") && json["elements"].is_array()) {
+                auto  arr = json["elements"];
+                for (size_t i=0; i<arr.size(); i++) {
+                    if (arr[i].is_object()) {
+                        auto o = arr[i];
+                        std::string id;
+                        if (o.contains("id") && o["id"].is_string()) {
+                            id = o["id"].get<std::string>();
                         } else {
                             JsonFormatError(fname, "Elements array contains invalid member (missing string id)");
                             return false;
                         }
                         MapTile* tile = this->add(id);
                         tile->light = 0;
-                        if (o.has("f")) {
+                        if (o.contains("f")) {
                             tile->isSpawnable = true;
                             tile->isSolid = false;
                             tile->isWall = false;
                             tile->blocksLight = false;
                             tile->solidFloor = true;
-                            if (o["f"].getType() == JSON::Type::String) {
-                                const char* f = o["f"].getCString();
-                                if (GlobalTextureRegistry->has(f)) {
-                                    tile->floor = GlobalTextureRegistry->of(f)->id;
+                            if (o["f"].is_string()) {
+                                std::string f = o["f"].get<std::string>();
+                                if (GlobalTextureRegistry->has(f.c_str())) {
+                                    tile->floor = GlobalTextureRegistry->of(f.c_str())->id;
                                 } else {
-                                    JsonFormatError(fname, "Elements array member contains unknown texture id", f);
+                                    JsonFormatError(fname, "Elements array member contains unknown texture id", f.c_str());
                                     return false;
                                 }
-                            } else if (o["f"].getType() == JSON::Type::Integer) {
-                                long long i = o["f"].getInteger();
+                            } else if (o["f"].is_number()) {
+                                int i = o["f"].get<int>();
                                 if (i >= 0 && i < 65536) {
                                     if (GlobalTextureRegistry->has(i)) {
                                         tile->floor = i;
@@ -95,21 +97,21 @@ class MapTileRegistry : public Registry<MapTile> {
                                 return false;
                             }
                         }
-                        if (o.has("c")) {
+                        if (o.contains("c")) {
                             tile->isSolid = false;
                             tile->isWall = false;
                             tile->blocksLight = false;
                             tile->solidCeiling = true;
-                            if (o["c"].getType() == JSON::Type::String) {
-                                const char* f = o["c"].getCString();
-                                if (GlobalTextureRegistry->has(f)) {
-                                    tile->ceiling = GlobalTextureRegistry->of(f)->id;
+                            if (o["c"].is_string()) {
+                                std::string f = o["c"].get<std::string>();
+                                if (GlobalTextureRegistry->has(f.c_str())) {
+                                    tile->ceiling = GlobalTextureRegistry->of(f.c_str())->id;
                                 } else {
-                                    JsonFormatError(fname, "Elements array member contains unknown texture id", f);
+                                    JsonFormatError(fname, "Elements array member contains unknown texture id", f.c_str());
                                     return false;
                                 }
-                            } else if (o["c"].getType() == JSON::Type::Integer) {
-                                long long i = o["c"].getInteger();
+                            } else if (o["c"].is_number()) {
+                                long long i = o["c"].get<int>();
                                 if (i >= 0 && i < 65536) {
                                     if (GlobalTextureRegistry->has(i)) {
                                         tile->ceiling = i;
@@ -126,21 +128,21 @@ class MapTileRegistry : public Registry<MapTile> {
                                 return false;
                             }
                         }
-                        if (o.has("w")) {
+                        if (o.contains("w")) {
                             tile->isWall = true;
                             tile->isSolid = true;
                             tile->blocksLight = true;
                             tile->solidFloor = tile->solidCeiling = true;
-                            if (o["w"].getType() == JSON::Type::String) {
-                                const char* f = o["w"].getCString();
-                                if (GlobalTextureRegistry->has(f)) {
-                                    tile->wall = GlobalTextureRegistry->of(f)->id;
+                            if (o["w"].is_string()) {
+                                std::string f = o["w"].get<std::string>();
+                                if (GlobalTextureRegistry->has(f.c_str())) {
+                                    tile->wall = GlobalTextureRegistry->of(f.c_str())->id;
                                 } else {
-                                    JsonFormatError(fname, "Elements array member contains unknown texture id", f);
+                                    JsonFormatError(fname, "Elements array member contains unknown texture id", f.c_str());
                                     return false;
                                 }
-                            } else if (o["w"].getType() == JSON::Type::Integer) {
-                                long long i = o["w"].getInteger();
+                            } else if (o["w"].is_number()) {
+                                long long i = o["w"].get<int>();
                                 if (i >= 0 && i < 65536) {
                                     if (GlobalTextureRegistry->has(i)) {
                                         tile->wall = i;
@@ -157,78 +159,78 @@ class MapTileRegistry : public Registry<MapTile> {
                                 return false;
                             }
                         }
-                        if (o.has("solid")) {
-                            if (o["solid"].getType() == JSON::Type::Boolean) {
-                                tile->isSolid = o["solid"].getBoolean();
+                        if (o.contains("solid")) {
+                            if (o["solid"].is_boolean()) {
+                                tile->isSolid = o["solid"].get<bool>();
                             } else {
                                 JsonFormatError(fname, "Elements array member contains invalid value type (should be bool) for field", "solid");
                                 return false;
                             }
                         }
-                        if (o.has("spawnable")) {
-                            if (o["spawnable"].getType() == JSON::Type::Boolean) {
-                                tile->isSpawnable = o["spawnable"].getBoolean();
+                        if (o.contains("spawnable")) {
+                            if (o["spawnable"].is_boolean()) {
+                                tile->isSpawnable = o["spawnable"].get<bool>();
                             } else {
                                 JsonFormatError(fname, "Elements array member contains invalid value type (should be bool) for field", "spawnable");
                                 return false;
                             }
                         }
-                        if (o.has("wall")) {
-                            if (o["wall"].getType() == JSON::Type::Boolean) {
-                                tile->isSolid = o["wall"].getBoolean();
+                        if (o.contains("wall")) {
+                            if (o["wall"].is_boolean()) {
+                                tile->isSolid = o["wall"].get<bool>();
                             } else {
                                 JsonFormatError(fname, "Elements array member contains invalid value type (should be bool) for field", "wall");
                                 return false;
                             }
                         }
-                        if (o.has("blockslight")) {
-                            if (o["blockslight"].getType() == JSON::Type::Boolean) {
-                                tile->blocksLight = o["blockslight"].getBoolean();
+                        if (o.contains("blockslight")) {
+                            if (o["blockslight"].is_boolean()) {
+                                tile->blocksLight = o["blockslight"].get<bool>();
                             } else {
                                 JsonFormatError(fname, "Elements array member contains invalid value type (should be bool) for field", "blockslight");
                                 return false;
                             }
                         }
-                        if (o.has("solidfloor")) {
-                            if (o["solidfloor"].getType() == JSON::Type::Boolean) {
-                                tile->solidFloor = o["solidfloor"].getBoolean();
+                        if (o.contains("solidfloor")) {
+                            if (o["solidfloor"].is_boolean()) {
+                                tile->solidFloor = o["solidfloor"].get<bool>();
                             } else {
                                 JsonFormatError(fname, "Elements array member contains invalid value type (should be bool) for field", "solidfloor");
                                 return false;
                             }
                         }
-                        if (o.has("solidceiling")) {
-                            if (o["solidceiling"].getType() == JSON::Type::Boolean) {
-                                tile->solidCeiling = o["solidceiling"].getBoolean();
+                        if (o.contains("solidceiling")) {
+                            if (o["solidceiling"].is_boolean()) {
+                                tile->solidCeiling = o["solidceiling"].get<bool>();
                             } else {
                                 JsonFormatError(fname, "Elements array member contains invalid value type (should be bool) for field", "solidceiling");
                                 return false;
                             }
                         }
-                        if (o.has("light")) {
-                            if (o["light"].getType() == JSON::Type::Integer) {
-                                tile->light = o["light"].getInteger();
+                        if (o.contains("light")) {
+                            if (o["light"].is_number()) {
+                                tile->light = o["light"].get<int>();
                             } else {
                                 JsonFormatError(fname, "Elements array mamber contains invalid value type (should be integer) for field", "light");
                                 return false;
                             }
                         }
-                        if (o.has("tint")) {
-                            if (o["tint"].getType() == JSON::Type::Array) {
-                                JSON::JSONArray& arr = o["tint"].getArray();
-                                if (arr.length != 3) {
+                        if (o.contains("tint")) {
+                            if (o["tint"].is_array()) {
+                                auto arr = o["tint"];
+                                if (arr.size() != 3) {
                                     JsonFormatError(fname, "Elements array member conatins invalid value type (should be 3-component integer array) for field", "tint");
                                     return false;
                                 }
-                                if (arr.members[0].getType() != JSON::Type::Integer ||
-                                    arr.members[1].getType() != JSON::Type::Integer ||
-                                    arr.members[2].getType() != JSON::Type::Integer) {
+                                if (!(arr[0].is_number() &&
+                                     arr[1].is_number() &&
+                                     arr[2].is_number())) {
                                         JsonFormatError(fname, "Elements array member conatins invalid value type (should be 3-component integer array) for field", "tint");
                                         return false;
                                 }
-                                tile->tintr = arr.members[0].getInteger();
-                                tile->tintg = arr.members[1].getInteger();
-                                tile->tintb = arr.members[2].getInteger();
+                                tile->tintr = arr[0].get<int>();
+                                tile->tintg = arr[1].get<int>();
+                                tile->tintb = arr[2].get<int>();
                             } else {
                                 JsonFormatError(fname, "Elements array mamber contains invalid value type (should be 3-component integer array) for field", "tint");
                                 return false;

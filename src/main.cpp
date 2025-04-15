@@ -4,11 +4,27 @@
 #include "rcamera.h"
 #include "Helpers.hpp"
 
+#define WIN_TITLE (char*)"BR92Engine"
+
 #pragma region main()
-int main(void)
+int main(int argc, char** argv)
 {
+#ifdef VR_SUPPORT
+	int boot_in_vr = -1;
+#endif
 	BR92Engine engine;
 	SetTraceLogCallback(_logprint);
+
+	for (int i=1; i<argc; i++) {
+#ifdef VR_SUPPORT
+		if (!strcmp(argv[i], "--vr") || !strcmp(argv[i], "-v")) {
+			boot_in_vr = 1;
+		}
+		if (!strcmp(argv[i], "--desktop") || !strcmp(argv[i], "-d")) {
+			boot_in_vr = 0;
+		}
+#endif
+	}
 
 #pragma region Engine Init
 
@@ -18,7 +34,15 @@ int main(void)
 	}
 	engine.LoadConfigs();
 	engine.LoadData();
-	engine.OpenWindow((char*)"BR92Engine");
+#ifdef VR_SUPPORT
+	if (boot_in_vr == 0) {
+#endif
+		engine.OpenWindow(WIN_TITLE);
+#ifdef VR_SUPPORT
+	} else {
+		engine.OpenWindowVR(WIN_TITLE);
+	}
+#endif
 	engine.InitMesher();
 	engine.InitCamera();
 	engine.InitImGui();

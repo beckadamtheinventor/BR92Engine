@@ -5,12 +5,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "type": "gdb",
+            "type": "lldb",
             "request": "launch",
-            "name": "Debug (GDB)",
-            "target": "build/BR92Engine.exe",
-            "cwd": "${workspaceRoot}",
-            "valuesFormatting": "parseText",
+            "name": "Launch",
+            "program": "${workspaceFolder}/build/BR92Engine.exe",
+            "args": [],
+            "cwd": "${workspaceFolder}",
             "preLaunchTask": "Build (Debug)"
         }
     ]

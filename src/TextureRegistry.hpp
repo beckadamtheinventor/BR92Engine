@@ -1,52 +1,58 @@
 #pragma once
 
 #include "AssetPath.hpp"
-#include "Json.hpp"
+#include "json/json.hpp"
 #include "Registry.hpp"
 #include "Helpers.hpp"
 #include "raylib.h"
 
+using JSON = nlohmann::json;
+
 struct RegisteredTexture {
     unsigned short id;
-    float ux, uy, uw, uh;
+    float ux=0, uy=0, uw=0, uh=0;
     Image image;
 };
+
+#define TILE_WIDTH 128
+#define ATLAS_WIDTH (TILE_WIDTH*64)
+#define ATLAS_WIDTH_F ((float)ATLAS_WIDTH)
 
 class TextureRegistry : public Registry<RegisteredTexture> {
     public:
     size_t length() {
         return nextid();
     }
+    RegisteredTexture *add(std::string id) {
+        return add(strdup(id.c_str()));
+    }
     RegisteredTexture *add(const char *id) {
         Image i = LoadImage(AssetPath::texture(id));
         if (IsImageReady(i)) {
-            if (i.width != 64 || i.height != 64) {
-                ImageResize(&i, 64, 64);
+            if (i.width != TILE_WIDTH || i.height != TILE_WIDTH) {
+                ImageResize(&i, TILE_WIDTH, TILE_WIDTH);
             }
-            RegisteredTexture* tt = new RegisteredTexture();
-            tt->id = nextid();
+            RegisteredTexture* tt = _add(id);
             tt->image = i;
-            tiles.append(tt);
-            dict[id] = tt->id;
             return tt;
         }
         return nullptr;
     }
     Texture2D build() {
-        Image atlas = GenImageColor(4096, 4096, {0,0,0,0});
+        Image atlas = GenImageColor(ATLAS_WIDTH, ATLAS_WIDTH, {0,0,0,0});
         unsigned int i = 0;
-        for (unsigned int y=0; y<4096; y += 64) {
-            for (unsigned int x=0; x<4096; x += 64) {
+        for (unsigned int y=0; y<ATLAS_WIDTH; y += TILE_WIDTH) {
+            for (unsigned int x=0; x<ATLAS_WIDTH; x += TILE_WIDTH) {
                 RegisteredTexture* tt = of(i++);
-                tt->ux = x / 4096.0f;
-                tt->uy = y / 4096.0f;
-                tt->uw = 64 / 4096.0f;
-                tt->uh = 64 / 4096.0f;
+                tt->ux = x / ATLAS_WIDTH_F;
+                tt->uy = y / ATLAS_WIDTH_F;
+                tt->uw = TILE_WIDTH / ATLAS_WIDTH_F;
+                tt->uh = TILE_WIDTH / ATLAS_WIDTH_F;
                 ImageDraw(
                     &atlas,
                     tt->image,
-                    {0,0,64,64},
-                    {(float)x, (float)y, 64, 64},
+                    {0,0,TILE_WIDTH,TILE_WIDTH},
+                    {(float)x, (float)y, TILE_WIDTH, TILE_WIDTH},
                     WHITE
                 );
                 UnloadImage(tt->image);
@@ -68,21 +74,21 @@ class TextureRegistry : public Registry<RegisteredTexture> {
     bool load(const char* fname) {
         fname = AssetPath::clone(fname);
         add("none");
-        char* datastr;
         std::ifstream fd(fname);
         if (fd.is_open()) {
-            size_t count = fstreamlen(fd);
-            datastr = new char[count+1];
-            fd.read(datastr, count);
-            datastr[count] = 0;
+            JSON json;
+            try {
+                fd >> json;
+            } catch (nlohmann::detail::parse_error err) {
+                TraceLog(LOG_ERROR, "Failed to load json from file %s! %s", fname, err.what());
+                return false;
+            }
             fd.close();
-            JSON::JSON json = JSON::deserialize(datastr);
-            delete [] datastr;
-            if (json.contains("elements") && json["elements"].getType() == JSON::Type::Array) {
-                JSON::JSONArray& arr = json["elements"].getArray();
-                for (size_t i=0; i<arr.length; i++) {
-                    if (arr[i].getType() == JSON::Type::String) {
-                        this->add(arr[i].getCString());
+            if (json.contains("elements") && json["elements"].is_array()) {
+                auto arr = json["elements"];
+                for (size_t i=0; i<arr.size(); i++) {
+                    if (arr[i].is_string()) {
+                        this->add(arr[i].get<std::string>());
                     }
                 }
             } else {
