@@ -8,6 +8,7 @@
 #include "ScriptEngine/ScriptBytecode.hpp"
 #include "ScriptEngine/ScriptInterface.hpp"
 #include "raylib.h"
+#include <fstream>
 #include <ios>
 
 using JSON = nlohmann::json;
@@ -18,6 +19,7 @@ class Script {
     unsigned short id;
     Script() {
         code.setInterface(GloablScriptInterface);
+        id = 0;
     }
     Script(const unsigned char* bytecode, size_t len) {
         load(bytecode, len);
@@ -29,7 +31,7 @@ class Script {
         code = ScriptBytecode(bytecode, len);
     }
     bool load(const char* fname) {
-        std::ifstream fd(fname, std::ios::in | std::ios::binary);
+        std::ifstream fd(fname, std::ios::binary);
         if (fd.is_open()) {
             size_t count = fstreamlen(fd);
             char* datastr = new char[count];
@@ -39,6 +41,11 @@ class Script {
             unsigned char* binary;
             size_t binlen = compiler.compile(datastr, count, &binary);
             code = ScriptBytecode(binary, binlen);
+            std::ofstream ofd(std::string(fname)+".bin", std::ios::binary);
+            if (ofd.is_open()) {
+                ofd.write((char*)binary, binlen);
+                ofd.close();
+            }
             delete [] datastr;
             return true;
         }
@@ -74,6 +81,7 @@ class ScriptRegistry : public Registry<Script> {
                             return false;
                         }
                         Script* script = this->add(id);
+                        script->id = nextid() - 1;
                         if (o.contains("script")) {
                             if (o["script"].is_string()) {
                                 script->load(AssetPath::root(o["script"].get<std::string>().c_str(), nullptr));
@@ -83,6 +91,7 @@ class ScriptRegistry : public Registry<Script> {
                             }
                         }
                         script->code.setInterface(interface);
+                        TraceLog(LOG_INFO, "Loaded Script #%u", script->id);
                     }
                 }
             }

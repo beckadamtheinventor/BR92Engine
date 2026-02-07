@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <cstdio>
+#include <string>
 #include "ScriptInterface.hpp"
 
 class ScriptBytecode {
@@ -27,9 +28,9 @@ class ScriptBytecode {
         GetEntityTimer, SetEntityTimer, RandomTeleportEntity, GetDeltaTime,
     };
     static constexpr const unsigned char DO_NOTHING_BYTECODE[] = {Opcode::Return, 0, Opcode::End};
-    static constexpr const size_t STACK_SIZE = 64;
+    static constexpr const size_t STACK_SIZE = 256;
     static constexpr const size_t MAX_CYCLES = 1024;
-    static constexpr const size_t MAX_VARS = 32;
+    static constexpr const size_t MAX_VARS = 64;
     static constexpr const i64 i64Zero = {.i = 0};
     const unsigned char *bytecode;
     size_t len;
@@ -48,7 +49,9 @@ class ScriptBytecode {
         StackOverflow,
         StackUnderflow,
         Timeout,
+        UNKNOWN,
     };
+    public:
     Result result;
     ScriptBytecode() {
         bytecode = DO_NOTHING_BYTECODE;
@@ -60,12 +63,28 @@ class ScriptBytecode {
         this->bytecode = bytecode;
         this->len = len;
         this->max_cycles = max_cycles;
-        if (this->len > 0) {
+        if (len > 0) {
             stack = new i64[STACK_SIZE];
             vars = new i64[MAX_VARS];
         } else {
             stack = vars = nullptr;
         }
+    }
+    static std::string getResultString(int result) {
+        static const std::string result_strings[Result::UNKNOWN] {
+            "Success",
+            "UnknownOpcode",
+            "OutOfBoundsRead",
+            "OutOfBoundsWrite",
+            "OutOfBoundsExec",
+            "StackOverflow",
+            "StackUnderflow",
+            "Timeout",
+        };
+        if (result >= Result::Success && result < Result::UNKNOWN) {
+            return result_strings[result];
+        }
+        return "UNKNOWN";
     }
     void setInterface(ScriptInterface *interface) {
         this->interface = interface;
@@ -82,12 +101,12 @@ class ScriptBytecode {
         size_t pc = 0;
         size_t sp = STACK_SIZE;
         i64 acc, bcc;
-        long long tmp, tmp2, tmp3, tmp4, tmp5;
-        float tmpf, tmpf2, tmpf3, tmpf4;
-        char tmpC;
-        short tmpS;
+        long long tmp, tmp2, tmp3;
+        double tmpf, tmpf2, tmpf3, tmpf4;
+        uint8_t tmpC;
+        uint16_t tmpS;
         int tmpI;
-        for (char i=0; i<8; i++) {
+        for (int i=0; i<8; i++) {
             retval[i] = 0;
         }
         acc.i = bcc.i = 0;
@@ -98,13 +117,16 @@ class ScriptBytecode {
                 result = Result::Timeout;
                 break;
             }
-            switch (next(pc)) {
+            uint8_t op = next(pc);
+            switch (op) {
                 case Nop:
                     break;
                 case Return:
                     tmp = next(pc);
                     if (tmp < 0 || tmp >= 8) {
                         result = Result::OutOfBoundsWrite;
+                    } else if (tmp == 0 && vars == nullptr) {
+                        retval[0] = 0;
                     } else {
                         tmp2 = next(pc);
                         retval[tmp] = getvar(tmp2).i;
@@ -133,7 +155,7 @@ class ScriptBytecode {
                     retval[0] = 6;
                     break;
                 case Random:
-                    acc.i = rand();
+                    acc.i = rand() | ((long long)rand() << 32);
                     break;
                 case End:
                     return Result::Success;
@@ -398,7 +420,7 @@ class ScriptBytecode {
                     push(sp, getvar(tmp));
                     break;
                 case Abs:
-                    acc.i = abs(acc.i);
+                    acc.i = std::abs(acc.i);
                     break;
                 case AbsF:
                     acc.f = fabs(acc.f);
@@ -527,9 +549,10 @@ class ScriptBytecode {
             }
         }
         if (result != Result::Success) {
-            printf("Program counter: 0x%04llX\n", pc-1);
-            printf("Stack pointer: 0x%04llX\n", sp);
-            printf("Accumulator: 0x%016llX\n", acc.i);
+            printf("Program counter: 0x%08zX\n", pc-1);
+            printf("Stack pointer: 0x%08zX\n", sp);
+            printf("Accumulator A: 0x%016llX\n", acc.i);
+            printf("Accumulator B: 0x%016llX\n", bcc.i);
         }
         return result;
     }
@@ -565,7 +588,7 @@ class ScriptBytecode {
                 vars[n] = val;
             }
         } else {
-            result = Result::OutOfBoundsRead;
+            result = Result::OutOfBoundsWrite;
         }
     }
     unsigned long long nextl(size_t &i) {
@@ -584,9 +607,10 @@ class ScriptBytecode {
         return (tmp & 0xff) | ((unsigned short)tmp2<<8);
     }
     unsigned char next(size_t &i) {
-        if (i < len)
+        if (i < len) {
             return bytecode[i++];
-        result = Result::OutOfBoundsRead;
+        }
+        result = Result::OutOfBoundsExec;
         return 0;
     }
 };

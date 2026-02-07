@@ -47,6 +47,7 @@ class Vec3 {
     T length() {
         return sqrt(x*x + y*y);
     }
+    
 };
 
 typedef Vec3<double> Vec3D;

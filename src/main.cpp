@@ -66,6 +66,7 @@ int main(int argc, char** argv)
 
 #pragma endregion
 
+	engine.SaveConfigs();
 	engine.EndWindow();
 
 	CloseLog();

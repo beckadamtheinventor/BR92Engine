@@ -5,27 +5,40 @@
 #include "Registry.hpp"
 #include "TextureRegistry.hpp"
 #include "ScriptRegistry.hpp"
+#include "raylib.h"
 #include <fstream>
 
 using JSON = nlohmann::json;
 
 class EntityType {
     public:
-    char* name=nullptr;
+    char* name;
     unsigned short id;
-    unsigned short script=0;
-    unsigned short script_init=0;
-    unsigned char nframes=1;
+    unsigned short script;
+    unsigned short script_init;
+    unsigned char nframes;
     union {
-        unsigned char flags=0;
+        unsigned char flags;
         struct {
             bool canmove : 1;
             bool facesplayer : 1;
         };
     };
-    float frametime=0.0f;
-    float scale=1.0f;
-    unsigned short textures[16] = {0};
+    float frametime;
+    float scale;
+    unsigned short textures[16];
+    EntityType() {
+        Clear();
+    }
+    void Clear() {
+        name = nullptr;
+        id = script = script_init = 0;
+        nframes = 1;
+        flags = 0;
+        frametime = 0.0f;
+        scale = 1.0f;
+        memset(textures, 0, sizeof(textures));
+    }
 };
 
 class EntityRegistry : public Registry<EntityType> {
@@ -56,7 +69,8 @@ class EntityRegistry : public Registry<EntityType> {
                             return false;
                         }
                         EntityType* ent = this->add(id);
-                        ent->name = nullptr;
+                        ent->Clear();
+                        ent->id = nextid() - 1;
                         memset(ent->textures, 0, sizeof(ent->textures));
                         if (o.contains("name")) {
                             if (o["name"].is_string()) {
@@ -143,7 +157,7 @@ class EntityRegistry : public Registry<EntityType> {
                                             JsonFormatError(fname, "Elements array member references non-existent script id", oo["init"].get<std::string>().c_str());
                                         }
                                         ent->script_init = script->id;
-                                    } else if (oo["init"].is_number()) {
+                                    } else if (oo["init"].is_number_unsigned()) {
                                         Script* script = GlobalScriptRegistry->of(oo["init"].get<unsigned int>());
                                         if (script == nullptr) {
                                             JsonFormatError(fname, "Elements array member references non-existent script id", oo["init"].get<unsigned int>());
@@ -160,7 +174,7 @@ class EntityRegistry : public Registry<EntityType> {
                                             JsonFormatError(fname, "Elements array member references non-existent script id", oo["update"].get<std::string>().c_str());
                                         }
                                         ent->script = script->id;
-                                    } else if (oo["update"].is_number()) {
+                                    } else if (oo["update"].is_number_unsigned()) {
                                         Script* script = GlobalScriptRegistry->of(oo["update"].get<unsigned int>());
                                         if (script == nullptr) {
                                             JsonFormatError(fname, "Elements array member references non-existent script id", oo["update"].get<unsigned int>());
@@ -176,7 +190,7 @@ class EntityRegistry : public Registry<EntityType> {
                                     JsonFormatError(fname, "Elements array member references non-existent script id", o["script"].get<std::string>().c_str());
                                 }
                                 ent->script = script->id;
-                            } else if (o["script"].is_number()) {
+                            } else if (o["script"].is_number_unsigned()) {
                                 Script* script = GlobalScriptRegistry->of(o["script"].get<unsigned int>());
                                 if (script == nullptr) {
                                     JsonFormatError(fname, "Elements array member references non-existent script id", o["script"].get<unsigned int>());
@@ -186,6 +200,7 @@ class EntityRegistry : public Registry<EntityType> {
                                 JsonFormatError(fname, "Elements array member contains invalid valid (should be string/int) for field", "script");
                             }
                         }
+                        TraceLog(LOG_INFO, "Loaded EntityType #%u script init: %u script update: %u", ent->id, ent->script_init, ent->script);
                     }
                 }
             }

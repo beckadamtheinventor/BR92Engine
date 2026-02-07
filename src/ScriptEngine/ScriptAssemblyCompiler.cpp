@@ -1,6 +1,7 @@
 #include "ScriptAssemblyCompiler.hpp"
 #include "../Registries.hpp"
 #include "raylib.h"
+#include <utility>
 
 static constexpr const char *opcodes[] {
     "nop", "rv", "returnDoNothing", "returnFail", "returnDestroy",
@@ -142,13 +143,13 @@ size_t ScriptAssemblyCompiler::compile(const char *data, size_t datalen, unsigne
         }
     } while (inoffset < datalen);
 
-    labels.add("eof", outbuf.size());
+    labels.insert(std::make_pair("eof", outbuf.size()));
 
     for (size_t i=0; i<labelusages.size(); i++) {
         labelusage_t *lbl = &labelusages[i];
         const char *name = lbl->label;
         size_t value = -1;
-        if (labels.has(name)) {
+        if (labels.count(name) > 0) {
             // resolved label address
             value = labels[lbl->label];
         } else {
@@ -215,7 +216,7 @@ ScriptAssemblyCompiler::Token ScriptAssemblyCompiler::next(const char *data, siz
         bool istexture = false;
         bool istile = false;
         bool isentity = false;
-        bool isitem = false;
+        // bool isitem = false;
         if (consumeToken(data, datalen, i, "texture:")) {
             istexture = true;
         } else if (consumeToken(data, datalen, i, "tile:")) {
@@ -261,7 +262,7 @@ ScriptAssemblyCompiler::Token ScriptAssemblyCompiler::next(const char *data, siz
         //     ;
         }
         tk = Integer;
-    } else if (c == '$' || c == '-' || c == '.' || c >= '0' && c <= '9') {
+    } else if (c == '$' || c == '-' || c == '.' || (c >= '0' && c <= '9')) {
         // number
         bool isfloat = false, neg = false, decimal = false;
         char base = 10;
@@ -287,7 +288,7 @@ ScriptAssemblyCompiler::Token ScriptAssemblyCompiler::next(const char *data, siz
                 isfloat = true;
                 decimal = true;
                 continue;
-            } else if (base == 10 && c == 'f' || c == 'F') {
+            } else if ((base == 10 && c == 'f') || c == 'F') {
                 isfloat = true;
                 break;
             } else if (c >= '0' && c <= '9') {
@@ -337,11 +338,11 @@ ScriptAssemblyCompiler::Token ScriptAssemblyCompiler::next(const char *data, siz
                 c = peek(data, datalen, i); i++;
             } while (c > ' ');
             const char *name = subcstr(data, datalen, j, i-j);
-            if (vars.has(name)) {
+            if (vars.count(name) > 0) {
                 token_int = vars[name];
             } else {
-                token_int = vars.length()+1;
-                vars.add(name, token_int);
+                token_int = vars.size()+1;
+                vars.insert(std::make_pair(name, token_int));
             }
         }
         tk = Integer;
@@ -354,11 +355,11 @@ ScriptAssemblyCompiler::Token ScriptAssemblyCompiler::next(const char *data, siz
         } while (c > ' ');
         i--;
         const char *name = subcstr(data, datalen, j, i-j);
-        if (labels.has(name)) {
+        if (labels.count(name)) {
             labels[name] = outbuf.size();
         } else {
             token_int = outbuf.size();
-            labels.add(name, token_int);
+            labels.insert(std::make_pair(name, token_int));
         }
         tk = Label;
     } else if (c == '@') {
@@ -376,7 +377,7 @@ ScriptAssemblyCompiler::Token ScriptAssemblyCompiler::next(const char *data, siz
         size_t j = i;
         do {
             c = peek(data, datalen, i); i++;
-        } while (c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || c == '_');
+        } while ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_');
         i--;
         char *name = subcstr(data, datalen, j, i-j);
         for (unsigned int i=0; name[i]>0; i++) {

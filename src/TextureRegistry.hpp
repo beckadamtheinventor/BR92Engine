@@ -34,6 +34,7 @@ class TextureRegistry : public Registry<RegisteredTexture> {
             }
             RegisteredTexture* tt = _add(id);
             tt->image = i;
+            tt->id = length() - 1;
             return tt;
         }
         return nullptr;
@@ -88,7 +89,9 @@ class TextureRegistry : public Registry<RegisteredTexture> {
                 auto arr = json["elements"];
                 for (size_t i=0; i<arr.size(); i++) {
                     if (arr[i].is_string()) {
-                        this->add(arr[i].get<std::string>());
+                        std::string name = arr[i].get<std::string>();
+                        RegisteredTexture* rt = this->add(name);
+                        TraceLog(LOG_INFO, "Loaded texture %u (%s)", rt->id, name.c_str());
                     }
                 }
             } else {

@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cmath>
 #include <thread>
+#include <utility>
 #include <vector>
 
 MapData* GlobalMapData=nullptr;
@@ -467,7 +468,7 @@ static void _GenerateMesh(TileArray* map, LightMap* lmap, MapTileRegistry* tileR
                         tid2 = map->getOrDefault({x-1, z});
                     } else if (fi == 4) { // +Z
                         tid2 = map->getOrDefault({x, z+1});
-                    } else if (fi == 5) { // -Z
+                    } else { // -Z
                         tid2 = map->getOrDefault({x, z-1});
                     }
                     tile2 = tileRegistry->of(tid2);
@@ -477,7 +478,7 @@ static void _GenerateMesh(TileArray* map, LightMap* lmap, MapTileRegistry* tileR
                 }
                 if (tid > 0) {
                     char fo = fi*3*4;
-                    for (char j=0; j<4; j++) {
+                    for (int j=0; j<4; j++) {
                         // TraceLog(LOG_INFO, "vertex %d, %d, %d [%u]",
                         //     cubeverts[fo + j*3 + 0] + x, cubeverts[fo + j*3 + 1], cubeverts[fo + j*3 + 2] + z, tid);
                         verts->push_back(
@@ -485,10 +486,10 @@ static void _GenerateMesh(TileArray* map, LightMap* lmap, MapTileRegistry* tileR
                             (cubeverts[fo + j*3 + 1]<<29) | // Y position
                             ((cubeverts[fo + j*3 + 0] + x)<<20) | // X position
                             ((cubeverts[fo + j*3 + 2] + z)<<12) | // Z position
-                            tid & 0xfff // texture ID
+                            (tid & 0xfff) // texture ID
                         );
                     }
-                    for (char j=0; j<6; j++) {
+                    for (int j=0; j<6; j++) {
                         // TraceLog(LOG_INFO, "index %d", mi+I[j]);
                         indices->push_back(mi+triangleindices[j]);
                     }
@@ -529,26 +530,39 @@ void MapData::GenerateMesh(size_t i) {
     delete indexarray;
 }
 
+#define THREAD_COUNT 4
 void MapData::GenerateMesh() {
-    std::thread threads[maps.size()];
-    std::vector<unsigned int>* vertarrays[maps.size()];
-    std::vector<unsigned short>* indexarrays[maps.size()];
-    for (size_t i=0; i<maps.size(); i++) {
-        vertarrays[i] = new std::vector<unsigned int>();
-        indexarrays[i] = new std::vector<unsigned short>();
-        vertarrays[i]->resize(maps[i].size()*6*4*2);
-        indexarrays[i]->resize(maps[i].size()*36);
-        threads[i] = std::thread(_GenerateMesh, &maps[i], lightmaps[i], tileRegistry, vertarrays[i], indexarrays[i]);
-    }
-    for (size_t i=0; i<maps.size(); i++) {
-        if (threads[i].joinable()) {
-            threads[i].join();
-            SetLevelMesh(i,
-                vertarrays[i]->size(), vertarrays[i]->data(),
-                indexarrays[i]->size()/3, indexarrays[i]->data()
+    std::vector<std::pair<int, std::thread>> threads;
+    std::vector<std::vector<unsigned int>*> vertarrays;
+    std::vector<std::vector<unsigned short>*> indexarrays;
+    threads.resize(THREAD_COUNT);
+    vertarrays.resize(THREAD_COUNT);
+    indexarrays.resize(THREAD_COUNT);
+    int threadNo = 0, started = 0, completed = 0;
+    while (completed < maps.size()) {
+        vertarrays[threadNo] = new std::vector<unsigned int>();
+        indexarrays[threadNo] = new std::vector<unsigned short>();
+        vertarrays[threadNo]->reserve(maps[started].size()*6*4*2);
+        indexarrays[threadNo]->reserve(maps[started].size()*36);
+        if (started < maps.size()) {
+            threads[threadNo] = std::make_pair(
+                started,
+                std::thread(
+                    _GenerateMesh, &maps[started], lightmaps[started],
+                    tileRegistry, vertarrays[threadNo], indexarrays[threadNo]
+                )
             );
-            delete vertarrays[i];
-            delete indexarrays[i];
+            started++;
+        }
+        threadNo = (threadNo++) % THREAD_COUNT;
+        if (threads[threadNo].second.joinable()) {
+            threads[threadNo].second.join();
+            int m = threads[threadNo].first;
+            SetLevelMesh(m,
+                vertarrays[threadNo]->size(), vertarrays[threadNo]->data(),
+                indexarrays[threadNo]->size()/3, indexarrays[threadNo]->data()
+            );
+            completed++;
         }
     }
 }

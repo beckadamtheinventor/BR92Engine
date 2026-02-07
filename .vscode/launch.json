@@ -8,10 +8,15 @@
             "type": "lldb",
             "request": "launch",
             "name": "Launch",
-            "program": "${workspaceFolder}/build/BR92Engine.exe",
             "args": [],
             "cwd": "${workspaceFolder}",
-            "preLaunchTask": "Build (Debug)"
+            "preLaunchTask": "Build (Debug)",
+            "linux": {
+                "program": "${workspaceFolder}/build/BR92Engine"
+            },
+            "windows": {
+                "program": "${workspaceFolder}/build/BR92Engine.exe"
+            }
         }
     ]
 }

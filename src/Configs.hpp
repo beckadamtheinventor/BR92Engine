@@ -1,6 +1,5 @@
 #pragma once
 
-#include "Dictionary.hpp"
 #include "json/json.hpp"
 #include <fstream>
 
@@ -66,7 +65,7 @@ class MainConfig : public ConfigFile {
         (*this)["WindowPosY"] = 40;
         (*this)["WindowFullscreen"] = false;
         (*this)["WindowMaximized"] = true;
-        (*this)["WindowSensitivity"] = 0.1f;
+        (*this)["MouseSensitivity"] = 0.1f;
         (*this)["FOVY"] = 60.0f;
         (*this)["PlayerX"] = 0.0f;
         (*this)["PlayerY"] = CFG_PLAYER_HEIGHT;

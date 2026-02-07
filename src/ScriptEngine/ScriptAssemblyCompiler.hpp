@@ -1,18 +1,19 @@
 #ifndef __SCRIPT_ASSEMBLY_COMPILER_HPP__
 #define __SCRIPT_ASSEMBLY_COMPILER_HPP__
 
-#include "../Dictionary.hpp"
+#include <map>
 #include <string.h>
+#include <string>
 #include <vector>
 
 class ScriptAssemblyCompiler {
-    Dictionary<size_t> vars;
+    std::map<std::string, size_t> vars;
     typedef struct {
         size_t offset;
         size_t lno;
         const char *label;
     } labelusage_t;
-    Dictionary<size_t> labels;
+    std::map<std::string, size_t> labels;
     std::vector<labelusage_t> labelusages;
     std::vector<unsigned char> outbuf;
 

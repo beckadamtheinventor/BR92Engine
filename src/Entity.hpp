@@ -113,7 +113,7 @@ class EntityRenderer : public std::vector<Entity*> {
             long long argv[2] = {(signed)i, ent->frameno};
             int res = script->code.run(2, argv, rval);
             if (res != ScriptBytecode::Result::Success) {
-                TraceLog(LOG_ERROR, "Script %u (Init) exited with code %d", i, res);
+                TraceLog(LOG_ERROR, "Script %u (Init) exited with code %d (%s)", i, res, ScriptBytecode::getResultString(res).c_str());
             }
         }
     }

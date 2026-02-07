@@ -15,6 +15,7 @@
 #include "MapData.hpp"
 #include "ScriptEngine/ScriptInterface.hpp"
 #include "ShaderLoader.hpp"
+#include <ctime>
 
 const char* MAIN_CONFIG_FILE = "config.dat";
 const char* SHADER_CONFIG_FILE = "assets/shaders/cfg.dat";
@@ -189,34 +190,37 @@ void BR92Engine::OpenWindow(char* title) {
 	SetConfigFlags(FLAG_WINDOW_RESIZABLE);
 	InitWindow(320, 240, title);
 
-	size_t win_w = cfg["WindowSizeX"].get<unsigned int>();
-	size_t win_h = cfg["WindowSizeY"].get<unsigned int>();
-	int win_x = cfg["WindowPosX"].get<int>();
-	int win_y = cfg["WindowPosY"].get<int>();
-	int m = GetCurrentMonitor();
-	if (win_w > GetMonitorWidth(m)) {
-		win_w = GetMonitorWidth(m);
-		win_x = 0;
-	}
-	if (win_h > GetMonitorHeight(m)) {
-		win_h = GetMonitorHeight(m) - 40;
-		win_y = 20;
-	}
-	SetWindowSize(win_w, win_h);
+	try {
+		size_t win_w = cfg["WindowSizeX"].get<unsigned int>();
+		size_t win_h = cfg["WindowSizeY"].get<unsigned int>();
+		int win_x = cfg["WindowPosX"].get<int>();
+		int win_y = cfg["WindowPosY"].get<int>();
+		int m = GetCurrentMonitor();
+		if (win_w > GetMonitorWidth(m)) {
+			win_w = GetMonitorWidth(m);
+			win_x = 0;
+		}
+		if (win_h > GetMonitorHeight(m)) {
+			win_h = GetMonitorHeight(m) - 40;
+			win_y = 20;
+		}
+		SetWindowSize(win_w, win_h);
 
-	if (cfg["WindowFullscreen"].get<bool>()) {
-		ToggleFullscreen();
-	} else if (cfg["WindowMaximized"].get<bool>()) {
-		MaximizeWindow();
-	} else {
-		SetWindowPosition(win_x, win_y);
+		if (cfg["WindowFullscreen"].get<bool>()) {
+			ToggleFullscreen();
+		} else if (cfg["WindowMaximized"].get<bool>()) {
+			MaximizeWindow();
+		} else {
+			SetWindowPosition(win_x, win_y);
+		}
+		targetFps = cfg["TargetFPS"].get<float>();
+		if (targetFps != -1 && targetFps < 15) {
+			targetFps = 15;
+		}
+		mouseSensitivity = cfg["MouseSensitivity"].get<float>();
+	} catch (JSON::exception err) {
+		TraceLog(LOG_ERROR, "Failed to load main config!");
 	}
-	targetFps = cfg["TargetFPS"].get<float>();
-	if (targetFps != -1 && targetFps < 15) {
-		targetFps = 15;
-	}
-	mouseSensitivity = cfg["MouseSensitivity"].get<float>();
-
 	SetWindowMinSize(320, 240);
 	SetTargetFPS(targetFps);
 	SetExitKey(-1);
@@ -818,9 +822,8 @@ void BR92Engine::SaveConfigs() {
 void BR92Engine::TakeScreenshot(Texture2D texture) {
 	char buf[128];
 	time_t t = time(nullptr);
-	struct tm ts;
-	localtime_s(&ts, &t);
-	strftime(buf, sizeof(buf), "BR92shot_%Y_%A_%B_%d_%I_%M_%S_%p.png", &ts);
+	struct tm* ts = localtime(&t);
+	strftime(buf, sizeof(buf), "BR92_screenshot_%Y_%A_%B_%d_%I_%M_%S_%p.png", ts);
 	Image screenimg = LoadImageFromTexture(texture);
 	ImageFlipVertical(&screenimg);
 	ExportImage(screenimg, buf);
