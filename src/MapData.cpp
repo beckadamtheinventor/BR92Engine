@@ -252,7 +252,7 @@ bool MapData::LoadLightMap(RBuffer& data) {
         return false;
     }
     LightMap* map = nullptr;
-    char sizeX, sizeZ;
+    unsigned int sizeX, sizeZ;
     if (i < lightmaps.size()) {
         map = lightmaps[i];
         sizeX = map->width();
@@ -268,7 +268,7 @@ bool MapData::LoadLightMap(RBuffer& data) {
         lightmaps[i] = map;
     }
     if (sizeX==0 || sizeZ==0) {
-        return false;
+        return true;
     }
     for (int z=0; z<sizeZ; z++) {
         for (int x=0; x<sizeX; x++) {
@@ -286,6 +286,7 @@ bool MapData::LoadLightMap(RBuffer& data) {
             *map->get(x, z) = l;
        }
     }
+    TraceLog(LOG_INFO, "Loaded lightmap #%llu size %d,%d", i, sizeX, sizeZ);
     return true;
 }
 
@@ -311,6 +312,8 @@ void MapData::SaveMap(std::ostream& fd) {
 #pragma region SaveMapTile()
 void MapData::SaveMapTile(std::ostream& fd, TileArray* map, Vec3I position) {
     fd.write(TILE_MAP_MAGIC_NUMBER_STR, 4);
+    unsigned int length = 4*3 + map->width()*map->height()*2;
+    fd.write((char*)&length, 4);
     fd.write((char*)&position.x, 4);
     fd.write((char*)&position.y, 4);
     fd.write((char*)&position.z, 4);
@@ -326,19 +329,28 @@ void MapData::SaveMapTile(std::ostream& fd, TileArray* map, Vec3I position) {
 #pragma endregion
 
 #pragma region SaveLightMap()
-void MapData::SaveLightMap(std::ostream& fd, size_t i, LightMap* map) {
-    if (map == nullptr) {
-        map = lightmaps[i];
+void MapData::SaveLightMap(std::ostream& fd, size_t i, LightMap* lmap) {
+    if (lmap == nullptr) {
+        lmap = lightmaps[i];
     }
     unsigned int il = i;
     fd.write(LIGHT_MAP_MAGIC_NUMBER_STR, 4);
+    unsigned int length = 4 + lmap->width()*lmap->height()*3;
+    fd.write((char*)&length, 4);
     fd.write((char*)&il, 4);
-    for (int z=0; z<map->height(); z++) {
-        for (int x=0; x<map->width(); x++) {
-            Color l = *map->get(x, z);
-            fd.put(l.r);
-            fd.put(l.g);
-            fd.put(l.b);
+    for (int z=0; z<lmap->height(); z++) {
+        for (int x=0; x<lmap->width(); x++) {
+            Color* lp = lmap->get(x, z);
+            if (lp == nullptr) {
+                fd.put(127u);
+                fd.put(127u);
+                fd.put(127u);
+            } else {
+                Color l = *lp;
+                fd.put(l.r);
+                fd.put(l.g);
+                fd.put(l.b);
+            }
         }
     }
 }

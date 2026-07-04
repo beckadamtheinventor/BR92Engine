@@ -309,7 +309,7 @@ void BR92Engine::BeforeMainLoop() {
 	freecam = false;
 	godmode = false;
 	noclip = false;
-	post_process_enabled = false;
+	ascii_shader_enabled = false;
 	if (cheats_enabled) {
 		freecam = cfg["FreecamEnabled"].get<bool>();
 		godmode = cfg["GodmodeEnabled"].get<bool>();
@@ -439,7 +439,7 @@ void BR92Engine::Draw() {
 
 			EndTextureMode();
 
-			if (post_process_enabled && IsShaderReady(postShader)) {
+			if (ascii_shader_enabled && IsShaderReady(postShader)) {
 				glUseProgram(postShader.id);
 				glActiveTexture(GL_TEXTURE0);
 				glBindTexture(GL_TEXTURE_2D, screenTexture.texture.id);
@@ -526,14 +526,34 @@ void BR92Engine::Draw() {
 
 				bool windowIsFullscreen = IsWindowFullscreen();
 				if (!vr_mode) {
-					if (ImGui::SliderInt("FPS Target", &targetFps, 15, 250)) {
-						if (targetFps >= 15) {
-							SetTargetFPS(targetFps);
+					if (ImGui::BeginCombo("Target FPS", targetFps < 0 ? "Unlimited" : TextFormat("%u", targetFps))) {
+						const int MIN_FPS = 15;
+						float w = ImGui::CalcItemWidth();
+						if (ImGui::Button("60", {w, 0})) {
+							SetTargetFPS((targetFps = 60));
 						}
-					}
-					if (ImGui::Button("Unlimited")) {
-						targetFps = -1;
-						SetTargetFPS(-1);
+						if (ImGui::Button("75", {w, 0})) {
+							SetTargetFPS((targetFps = 75));
+						}
+						if (ImGui::Button("120", {w, 0})) {
+							SetTargetFPS((targetFps = 120));
+						}
+						if (ImGui::Button("144", {w, 0})) {
+							SetTargetFPS((targetFps = 144));
+						}
+						if (ImGui::Button("Unlimited", {w, 0})) {
+							SetTargetFPS((targetFps = -1));
+						}
+						ImGui::PushID("Custom");
+						if (ImGui::SliderInt(" ", &targetFps, MIN_FPS, 144)) {
+							if (targetFps >= MIN_FPS) {
+								SetTargetFPS(targetFps);
+							} else {
+								SetTargetFPS(MIN_FPS);
+							}
+						}
+						ImGui::PopID();
+						ImGui::EndCombo();
 					}
 					if (ImGui::Checkbox("Fullscreen", &windowIsFullscreen)) {
 						ToggleFullscreen();
@@ -542,10 +562,48 @@ void BR92Engine::Draw() {
 				}
 				if (ImGui::SliderFloat("Render Distance", &GlobalMapData->renderDistance, 10.0f, 200.0f)) {}
 				if (!vr_mode) {
-					if (ImGui::SliderInt("Render Scale", &renderScale, 320, 8192)) {
-						ResizeWindow();
+					if (ImGui::BeginCombo("Render Scale", TextFormat("%u", renderScale))) {
+						float w = ImGui::CalcItemWidth();
+						if (ImGui::Button("80", {w, 0})) {
+							renderScale = 80;
+							ResizeWindow();
+						}
+						if (ImGui::Button("160", {w, 0})) {
+							renderScale = 160;
+							ResizeWindow();
+						}
+						if (ImGui::Button("320", {w, 0})) {
+							renderScale = 320;
+							ResizeWindow();
+						}
+						if (ImGui::Button("640", {w, 0})) {
+							renderScale = 640;
+							ResizeWindow();
+						}
+						if (ImGui::Button("1024", {w, 0})) {
+							renderScale = 1024;
+							ResizeWindow();
+						}
+						if (ImGui::Button("1920", {w, 0})) {
+							renderScale = 1920;
+							ResizeWindow();
+						}
+						if (ImGui::Button("3840", {w, 0})) {
+							renderScale = 3840;
+							ResizeWindow();
+						}
+						if (ImGui::Button("7680", {w, 0})) {
+							renderScale = 7680;
+							ResizeWindow();
+						}
+						ImGui::PushID("Custom");
+						if (ImGui::SliderInt(" ", &renderScale, 80, 8192)) {
+							ResizeWindow();
+						}
+						ImGui::PopID();
+						ImGui::EndCombo();
 					}
-					ImGui::Checkbox("Enable Post-processing", &post_process_enabled);
+					ImGui::Checkbox("Enable Ascii shader", &ascii_shader_enabled);
 				}
 				if (ImGui::Button("Take Screenshot (F2)")) {
 					this->TakeScreenshot(screenTexture.texture);
@@ -608,33 +666,33 @@ void BR92Engine::Draw() {
 					GlobalMapData->SaveMap(levelFileName);
 				}
 				ImGui::Checkbox("Save on Exit", &save_on_exit);
-				// lightChanged |= ImGui::SliderFloat("Light value", &dev_lightValue, 0, 255);
-				// lightChanged |= ImGui::ColorEdit3("Light Color", dev_lightColor);
-				// ImGui::Checkbox("Live Update", &dev_liveUpdateLight);
-				// if (dev_liveUpdateLight || ImGui::Button("Set Light")) {
-				// 	map->setLight(dev_lightPosition, dev_lightValue, dev_lightColor[2]*255.0f, dev_lightColor[1]*255.0f, dev_lightColor[0]*255.0f);
-				// 	lightChanged = false;
-				// }
-				// ImGui::Checkbox("Live Follow", &dev_liveFollowLight);
-				// if (dev_liveFollowLight || ImGui::Button("Set Position")) {
-				// 	dev_lightPosition = camera.position;
-				// }
-				// fillArea |= ImGui::Button("Fill Area");
-				// if (fillArea) {
-				// 	if (!position1Set) {
-				// 		position1Set |= ImGui::Button("Position 1");
-				// 		if (position1Set) {
-				// 			fillPosition1 = camera.position;
-				// 		}
-				// 	} else if (!position2Set) {
-				// 		position2Set |= ImGui::Button("Position 2");
-				// 		if (position2Set) {
-				// 			fillPosition2 = camera.position;
-				// 			map->setLight(fillPosition1, fillPosition2, dev_lightValue, dev_lightColor[2]*255.0f, dev_lightColor[1]*255.0f, dev_lightColor[0]*255.0f);
-				// 			position2Set = position1Set = fillArea = false;
-				// 		}
-				// 	}
-				// }
+				lightChanged |= ImGui::SliderFloat("Light value", &dev_lightValue, 0, 255);
+				lightChanged |= ImGui::ColorEdit3("Light Color", dev_lightColor);
+				ImGui::Checkbox("Live Update", &dev_liveUpdateLight);
+				if (dev_liveUpdateLight || ImGui::Button("Set Light")) {
+					GlobalMapData->setLight(dev_lightPosition, dev_lightValue, dev_lightColor[2]*255.0f, dev_lightColor[1]*255.0f, dev_lightColor[0]*255.0f);
+					lightChanged = false;
+				}
+				ImGui::Checkbox("Live Follow", &dev_liveFollowLight);
+				if (dev_liveFollowLight || ImGui::Button("Set Position")) {
+					dev_lightPosition = camera.position;
+				}
+				fillArea |= ImGui::Button("Fill Area");
+				if (fillArea) {
+					if (!position1Set) {
+						position1Set |= ImGui::Button("Position 1");
+						if (position1Set) {
+							fillPosition1 = camera.position;
+						}
+					} else if (!position2Set) {
+						position2Set |= ImGui::Button("Position 2");
+						if (position2Set) {
+							fillPosition2 = camera.position;
+							GlobalMapData->setLight(fillPosition1, fillPosition2, dev_lightValue, dev_lightColor[2]*255.0f, dev_lightColor[1]*255.0f, dev_lightColor[0]*255.0f);
+							position2Set = position1Set = fillArea = false;
+						}
+					}
+				}
 				ImGui::End();
 			}
 #pragma endregion

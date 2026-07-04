@@ -60,12 +60,11 @@ class BR92Engine {
             bool cheats_enabled : 1;
             bool cursor_enabled : 1;
             bool dev_enabled : 1;
-            bool dev_liveUpdateLight : 1;
-            bool dev_liveFollowLight : 1;
             bool vr_mode : 1;
         };
     };
-    bool freecam, godmode, noclip, save_on_exit, post_process_enabled;
+    bool dev_liveUpdateLight, dev_liveFollowLight;
+    bool freecam, godmode, noclip, save_on_exit, ascii_shader_enabled;
     short keyForward, keyBackward, keyLeft, keyRight, keyJump, keySprint, keyCrouch, keyUp, keyDown;
     void Init();
     bool LoadRegistries(char* textures=nullptr, char* tiles=nullptr, char* entities=nullptr, char* scripts=nullptr);
